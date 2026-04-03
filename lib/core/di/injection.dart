@@ -1,0 +1,111 @@
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:get_it/get_it.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'package:logger/logger.dart';
+
+import '../../features/auth/data/datasources/auth_remote_data_source.dart';
+import '../../features/auth/data/repositories/auth_repository_impl.dart';
+import '../../features/auth/domain/repositories/auth_repository.dart';
+import '../../features/auth/domain/usecases/sign_in_with_apple.dart';
+import '../../features/auth/domain/usecases/sign_in_with_google.dart';
+import '../../features/auth/domain/usecases/sign_out.dart';
+import '../../features/auth/domain/usecases/verify_and_save_user.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/home/data/datasources/home_remote_data_source.dart';
+import '../../features/home/data/repositories/home_repository_impl.dart';
+import '../../features/home/domain/repositories/home_repository.dart';
+import '../../features/home/domain/usecases/get_welcome_message.dart';
+import '../../features/home/presentation/bloc/home_bloc.dart';
+import '../network/dio_client.dart';
+import '../network/network_info.dart';
+
+final sl = GetIt.instance;
+
+Future<void> initDependencies() async {
+  sl
+    ..registerLazySingleton<Logger>(Logger.new)
+    ..registerLazySingleton<Dio>(Dio.new)
+    ..registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance)
+    ..registerLazySingleton<GoogleSignIn>(() => GoogleSignIn.instance)
+    ..registerLazySingleton<Connectivity>(Connectivity.new)
+    ..registerLazySingleton<InternetConnectionChecker>(
+      InternetConnectionChecker.createInstance,
+    );
+
+  await sl<GoogleSignIn>().initialize();
+
+  sl.registerLazySingleton<DioClient>(() => DioClient(dio: sl<Dio>()));
+
+  sl.registerLazySingleton<NetworkInfo>(
+    () => NetworkInfoImpl(
+      connectivity: sl<Connectivity>(),
+      connectionChecker: sl<InternetConnectionChecker>(),
+    ),
+  );
+
+  sl.registerLazySingleton<AuthRemoteDataSource>(
+    () => AuthRemoteDataSourceImpl(
+      firebaseAuth: sl<FirebaseAuth>(),
+      googleSignIn: sl<GoogleSignIn>(),
+      dioClient: sl<DioClient>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<AuthRepository>(
+    () => AuthRepositoryImpl(
+      remoteDataSource: sl<AuthRemoteDataSource>(),
+      networkInfo: sl<NetworkInfo>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<SignInWithGoogle>(
+    () => SignInWithGoogle(sl<AuthRepository>()),
+  );
+
+  sl.registerLazySingleton<SignInWithApple>(
+    () => SignInWithApple(sl<AuthRepository>()),
+  );
+
+  sl.registerLazySingleton<VerifyAndSaveUser>(
+    () => VerifyAndSaveUser(sl<AuthRepository>()),
+  );
+
+  sl.registerLazySingleton<SignOut>(() => SignOut(sl<AuthRepository>()));
+
+  sl.registerFactory<AuthBloc>(
+    () => AuthBloc(
+      signInWithGoogle: sl<SignInWithGoogle>(),
+      signInWithApple: sl<SignInWithApple>(),
+      verifyAndSaveUser: sl<VerifyAndSaveUser>(),
+      signOut: sl<SignOut>(),
+    ),
+  );
+
+  sl.registerLazySingleton<HomeRemoteDataSource>(
+    () => HomeRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<HomeRepository>(
+    () => HomeRepositoryImpl(
+      remoteDataSource: sl<HomeRemoteDataSource>(),
+      networkInfo: sl<NetworkInfo>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<GetWelcomeMessage>(
+    () => GetWelcomeMessage(sl<HomeRepository>()),
+  );
+
+  sl.registerFactory<HomeBloc>(
+    () => HomeBloc(getWelcomeMessage: sl<GetWelcomeMessage>()),
+  );
+}

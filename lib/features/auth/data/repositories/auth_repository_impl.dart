@@ -1,0 +1,126 @@
+import 'package:dartz/dartz.dart';
+import 'package:logger/logger.dart';
+
+import '../../../../core/error/exceptions.dart';
+import '../../../../core/error/failures.dart';
+import '../../../../core/network/network_info.dart';
+import '../../domain/entities/auth_user_entity.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../datasources/auth_remote_data_source.dart';
+
+class AuthRepositoryImpl implements AuthRepository {
+  AuthRepositoryImpl({
+    required AuthRemoteDataSource remoteDataSource,
+    required NetworkInfo networkInfo,
+    required Logger logger,
+  }) : _remoteDataSource = remoteDataSource,
+       _networkInfo = networkInfo,
+       _logger = logger;
+
+  final AuthRemoteDataSource _remoteDataSource;
+  final NetworkInfo _networkInfo;
+  final Logger _logger;
+
+  @override
+  Future<Either<Failure, AuthUserEntity>> signInWithGoogle() async {
+    final hasConnection = await _networkInfo.isConnected;
+    if (!hasConnection) {
+      return const Left(ConnectionFailure('No internet connection'));
+    }
+
+    try {
+      final user = await _remoteDataSource.signInWithGoogle();
+      return Right(user);
+    } on ServerException catch (error, stackTrace) {
+      _logger.e('Auth server exception', error: error, stackTrace: stackTrace);
+      return Left(ServerFailure(error.message));
+    } catch (error, stackTrace) {
+      _logger.e('Auth unknown exception', error: error, stackTrace: stackTrace);
+      return const Left(ServerFailure('Authentication failed'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> verifyAndSaveUser({
+    required String email,
+    required String mobile,
+    required String authToken,
+  }) async {
+    final hasConnection = await _networkInfo.isConnected;
+    if (!hasConnection) {
+      return const Left(ConnectionFailure('No internet connection'));
+    }
+
+    try {
+      await _remoteDataSource.verifyAndSaveUser(
+        email: email,
+        mobile: mobile,
+        authToken: authToken,
+      );
+      return const Right(unit);
+    } on ServerException catch (error, stackTrace) {
+      _logger.e(
+        'Verify user server exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return Left(ServerFailure(error.message));
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Verify user unknown exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const Left(ServerFailure('Unable to verify user details'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> signInWithApple() async {
+    final hasConnection = await _networkInfo.isConnected;
+    if (!hasConnection) {
+      return const Left(ConnectionFailure('No internet connection'));
+    }
+
+    try {
+      await _remoteDataSource.signInWithApple();
+      return const Right(unit);
+    } on ServerException catch (error, stackTrace) {
+      _logger.e(
+        'Apple auth server exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return Left(ServerFailure(error.message));
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Apple auth unknown exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const Left(ServerFailure('Apple authentication failed'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> signOut() async {
+    try {
+      await _remoteDataSource.signOut();
+      return const Right(unit);
+    } on ServerException catch (error, stackTrace) {
+      _logger.e(
+        'Logout server exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return Left(ServerFailure(error.message));
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Logout unknown exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const Left(ServerFailure('Logout failed'));
+    }
+  }
+}

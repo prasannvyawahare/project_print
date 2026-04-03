@@ -1,0 +1,72 @@
+class AppDimensions {
+  const AppDimensions._();
+
+  static const double designWidth = 390;
+  static const double compactHeightBreakpoint = 760;
+
+  static const double spacing2 = 2;
+  static const double spacing6 = 6;
+  static const double spacing8 = 8;
+  static const double spacing10 = 10;
+  static const double spacing12 = 12;
+  static const double spacing14 = 14;
+  static const double spacing15 = 15;
+  static const double spacing16 = 16;
+  static const double spacing18 = 18;
+  static const double spacing20 = 20;
+  static const double spacing22 = 22;
+  static const double spacing24 = 24;
+  static const double spacing28 = 28;
+  static const double spacing30 = 30;
+  static const double spacing32 = 32;
+  static const double spacing34 = 34;
+  static const double spacing36 = 36;
+  static const double spacing40 = 40;
+  static const double spacing44 = 44;
+  static const double spacing46 = 46;
+  static const double spacing48 = 48;
+  static const double spacing52 = 52;
+  static const double spacing54 = 54;
+  static const double spacing56 = 56;
+  static const double spacing62 = 62;
+  static const double spacing64 = 64;
+  static const double spacing70 = 70;
+  static const double spacing74 = 74;
+  static const double spacing78 = 78;
+  static const double spacing80 = 80;
+  static const double spacing82 = 82;
+  static const double spacing86 = 86;
+  static const double spacing90 = 90;
+  static const double spacing92 = 92;
+  static const double spacing94 = 94;
+  static const double spacing98 = 98;
+  static const double spacing100 = 100;
+  static const double spacing110 = 110;
+  static const double spacing112 = 112;
+  static const double spacing116 = 116;
+  static const double spacing124 = 124;
+  static const double spacing150 = 150;
+  static const double spacing165 = 165;
+  static const double spacing180 = 180;
+  static const double spacing190 = 190;
+  static const double spacing220 = 220;
+  static const double spacing230 = 230;
+  static const double spacing260 = 260;
+  static const double spacing300 = 300;
+  static const double spacing420 = 420;
+
+  static const double radius18 = 18;
+  static const double radius20 = 20;
+  static const double radius40 = 40;
+  static const double radius46 = 46;
+  static const double radius52 = 52;
+  static const double radius54 = 54;
+  static const double radius99 = 99;
+  static const double radius100 = 100;
+
+  static const double icon36 = 36;
+  static const double icon38 = 38;
+  static const double icon42 = 42;
+  static const double icon54 = 54;
+  static const double icon80 = 80;
+}
