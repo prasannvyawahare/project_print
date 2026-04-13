@@ -16,12 +16,13 @@ class AuthAppleSignInRequested extends AuthEvent {
 }
 
 class AuthManualMobileSubmitted extends AuthEvent {
-  const AuthManualMobileSubmitted(this.mobile);
+  const AuthManualMobileSubmitted({required this.mobile, required this.token});
 
   final String mobile;
+  final String token;
 
   @override
-  List<Object?> get props => [mobile];
+  List<Object?> get props => [mobile, token];
 }
 
 class AuthLogoutRequested extends AuthEvent {

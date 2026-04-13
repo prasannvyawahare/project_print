@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:internet_connection_checker/internet_connection_checker.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/data/datasources/auth_remote_data_source.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
@@ -21,13 +22,17 @@ import '../../features/home/domain/usecases/get_welcome_message.dart';
 import '../../features/home/presentation/bloc/home_bloc.dart';
 import '../network/dio_client.dart';
 import '../network/network_info.dart';
+import '../storage/temporary_auth_store.dart';
 
 final sl = GetIt.instance;
 
 Future<void> initDependencies() async {
+  final sharedPreferences = await SharedPreferences.getInstance();
+
   sl
     ..registerLazySingleton<Logger>(Logger.new)
     ..registerLazySingleton<Dio>(Dio.new)
+    ..registerLazySingleton<SharedPreferences>(() => sharedPreferences)
     ..registerLazySingleton<FirebaseAuth>(() => FirebaseAuth.instance)
     ..registerLazySingleton<GoogleSignIn>(() => GoogleSignIn.instance)
     ..registerLazySingleton<Connectivity>(Connectivity.new)
@@ -37,7 +42,14 @@ Future<void> initDependencies() async {
 
   await sl<GoogleSignIn>().initialize();
 
-  sl.registerLazySingleton<DioClient>(() => DioClient(dio: sl<Dio>()));
+  sl.registerLazySingleton<TemporaryAuthStore>(
+    () => TemporaryAuthStore(preferences: sl<SharedPreferences>()),
+  );
+
+  sl.registerLazySingleton<DioClient>(
+    () =>
+        DioClient(dio: sl<Dio>(), temporaryAuthStore: sl<TemporaryAuthStore>()),
+  );
 
   sl.registerLazySingleton<NetworkInfo>(
     () => NetworkInfoImpl(
@@ -51,6 +63,7 @@ Future<void> initDependencies() async {
       firebaseAuth: sl<FirebaseAuth>(),
       googleSignIn: sl<GoogleSignIn>(),
       dioClient: sl<DioClient>(),
+      temporaryAuthStore: sl<TemporaryAuthStore>(),
       logger: sl<Logger>(),
     ),
   );

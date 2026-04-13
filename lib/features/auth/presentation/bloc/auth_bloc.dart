@@ -128,7 +128,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     final email = state.pendingEmail.trim();
-    final authToken = state.pendingAuthToken.trim();
+    final authToken = event.token.trim().isNotEmpty
+        ? event.token.trim()
+        : state.pendingAuthToken.trim();
     final mobile = event.mobile.trim();
 
     if (email.isEmpty) {

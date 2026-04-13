@@ -1,5 +1,3 @@
-import 'dart:developer';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -9,6 +7,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/storage/temporary_auth_store.dart';
 import '../models/auth_user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -27,15 +26,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required FirebaseAuth firebaseAuth,
     required GoogleSignIn googleSignIn,
     required DioClient dioClient,
+    required TemporaryAuthStore temporaryAuthStore,
     required Logger logger,
   }) : _firebaseAuth = firebaseAuth,
        _googleSignIn = googleSignIn,
        _dioClient = dioClient,
+       _temporaryAuthStore = temporaryAuthStore,
        _logger = logger;
 
   final FirebaseAuth _firebaseAuth;
   final GoogleSignIn _googleSignIn;
   final DioClient _dioClient;
+  final TemporaryAuthStore _temporaryAuthStore;
   final Logger _logger;
 
   @override
@@ -44,16 +46,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final GoogleSignInAccount account = await _googleSignIn.authenticate();
       final GoogleSignInAuthentication googleAuth = account.authentication;
 
-      final String? _idToken = googleAuth.idToken;
+      final String? idToken = googleAuth.idToken?.trim();
       _logger.i('Google sign-in successful, ID token obtained');
-      if (_idToken == null || _idToken.isEmpty) {
+      if (idToken == null || idToken.isEmpty) {
         throw ServerException(
           message: 'Google sign-in failed: missing account token.',
         );
       }
 
       final OAuthCredential credential = GoogleAuthProvider.credential(
-        idToken: _idToken,
+        idToken: idToken,
       );
 
       final userCredential = await _firebaseAuth.signInWithCredential(
@@ -64,50 +66,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final String email = user?.email ?? account.email;
       final String? mobile = user?.phoneNumber;
 
-      final String resolvedToken = (await user?.getIdToken(true) ?? "");
-      print("------------ ${resolvedToken.toString()} -------------");
-
-      log(resolvedToken.toString() ?? "XXXXXXXXXXXX");
-      // final String headerRToken = idToken.trim();
-      // //_logger.i('headerToken: $headerToken');
       if (email.isEmpty) {
         throw ServerException(
           message: 'Google account email is not available.',
         );
       }
 
-      if (resolvedToken.isEmpty || resolvedToken.isEmpty) {
-        throw ServerException(
-          message: 'Sign-in token is missing. Please try again.',
-        );
-      }
+      _logger.i('Using Google ID token for verify-and-save request');
 
-      //_logger.i('Fetched ID token: $resolvedToken');
-      final metadata = {
-        'email': email,
-        'displayName': user?.displayName ?? account.displayName,
-        'mobile': mobile,
-        'uid': user?.uid,
-        'providerId': userCredential.credential?.providerId,
-        'googleAccountId': account.id,
-        'photoUrl': user?.photoURL ?? account.photoUrl,
-        'createdAt': user?.metadata.creationTime?.toIso8601String(),
-        'lastSignInAt': user?.metadata.lastSignInTime?.toIso8601String(),
-        'emailVerified': user?.emailVerified,
-
-        'idToken': '$resolvedToken',
-      };
-
-      //_logger.i('Gmail login metadata: $metadata');
-      _logger.i("Auth token (ccc): $resolvedToken");
-      // //_logger.i('Auth token (idToken): $resolvedToken');
-      // //_logger.i('Auth token (refreshToken): ${user?.refreshToken}');
-
-      return AuthUserModel(
-        email: email,
-        mobile: mobile,
-        authToken: resolvedToken,
+      await _temporaryAuthStore.save(
+        mobile: mobile?.trim() ?? '',
+        token: idToken,
       );
+
+      return AuthUserModel(email: email, mobile: mobile, authToken: idToken);
     } on ServerException {
       rethrow;
     } on FirebaseAuthException catch (error) {
@@ -130,16 +102,29 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String authToken,
   }) async {
     try {
-      //_logger.i('idToken for verify-and-save: $authToken');
+      final trimmedToken = authToken.trim();
+      final trimmedMobile = mobile.trim();
+
+      if (trimmedToken.isEmpty) {
+        throw ServerException(
+          message: 'Auth token missing. Please sign in again.',
+        );
+      }
+
+      // Keep the latest token in shared store so interceptor applies it to all next APIs.
+      await _temporaryAuthStore.save(
+        mobile: trimmedMobile,
+        token: trimmedToken,
+      );
 
       final user = AuthUserModel(email: email, mobile: mobile);
       await _dioClient.post(
         path: ApiConstants.verifyAndSaveUserPath,
-        data: user.toVerifyPayload(mobileNumber: mobile),
+        data: user.toVerifyPayload(mobileNumber: trimmedMobile),
         headers: {
-          'Authorization': 'Bearer $authToken',
-          'Content-Type': 'application/json',
-        }, //'Authorization': '$authToken'
+          'authorization': 'Bearer $trimmedToken',
+          'content-type': 'application/json',
+        },
       );
     } on DioException catch (error) {
       final data = error.response?.data;
@@ -189,6 +174,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await _googleSignIn.signOut();
       await _firebaseAuth.signOut();
+      await _temporaryAuthStore.clear();
     } catch (error, stackTrace) {
       _logger.e('Sign out error', error: error, stackTrace: stackTrace);
       throw ServerException(message: 'Unable to log out. Please try again.');

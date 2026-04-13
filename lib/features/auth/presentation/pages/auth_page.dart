@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_dimensions.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/storage/temporary_auth_store.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -22,19 +24,23 @@ class _AuthPageState extends State<AuthPage> {
     Navigator.of(context).pushReplacementNamed(AppRouter.main);
   }
 
-  Future<void> _showMobileFallbackDialog(String email) async {
+  Future<void> _showMobileFallbackDialog(
+    String email,
+    String pendingToken,
+  ) async {
     if (_isMobileDialogOpen) return;
     _isMobileDialogOpen = true;
 
-    final controller = TextEditingController();
+    final mobileController = TextEditingController();
+    final tokenController = TextEditingController(text: pendingToken);
     final formKey = GlobalKey<FormState>();
 
-    final mobile = await showDialog<String>(
+    final result = await showDialog<({String mobile, String token})>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Enter mobile number'),
+          title: const Text('Enter mobile and token'),
           content: Form(
             key: formKey,
             child: Column(
@@ -47,7 +53,7 @@ class _AuthPageState extends State<AuthPage> {
                 ),
                 const SizedBox(height: AppDimensions.spacing12),
                 TextFormField(
-                  controller: controller,
+                  controller: mobileController,
                   keyboardType: TextInputType.phone,
                   maxLength: 10,
                   decoration: const InputDecoration(
@@ -69,6 +75,22 @@ class _AuthPageState extends State<AuthPage> {
                     return null;
                   },
                 ),
+                const SizedBox(height: AppDimensions.spacing12),
+                TextFormField(
+                  controller: tokenController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'API token (temporary)',
+                    hintText: 'Paste token here',
+                  ),
+                  validator: (value) {
+                    final input = (value ?? '').trim();
+                    if (input.isEmpty) {
+                      return 'Token is required';
+                    }
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -82,7 +104,10 @@ class _AuthPageState extends State<AuthPage> {
                 if (formKey.currentState?.validate() != true) {
                   return;
                 }
-                Navigator.of(dialogContext).pop(controller.text.trim());
+                Navigator.of(dialogContext).pop((
+                  mobile: mobileController.text.trim(),
+                  token: tokenController.text.trim(),
+                ));
               },
               child: const Text('Continue'),
             ),
@@ -93,11 +118,18 @@ class _AuthPageState extends State<AuthPage> {
 
     _isMobileDialogOpen = false;
 
-    if (!mounted || mobile == null || mobile.isEmpty) {
+    if (!mounted || result == null) {
       return;
     }
 
-    context.read<AuthBloc>().add(AuthManualMobileSubmitted(mobile));
+    await sl<TemporaryAuthStore>().save(
+      mobile: result.mobile,
+      token: result.token,
+    );
+
+    context.read<AuthBloc>().add(
+      AuthManualMobileSubmitted(mobile: result.mobile, token: result.token),
+    );
   }
 
   @override
@@ -117,7 +149,10 @@ class _AuthPageState extends State<AuthPage> {
 
           if (state.nextStep == AuthNextStep.enterMobile &&
               state.pendingEmail.isNotEmpty) {
-            _showMobileFallbackDialog(state.pendingEmail);
+            _showMobileFallbackDialog(
+              state.pendingEmail,
+              state.pendingAuthToken,
+            );
           }
 
           if (state.status == AuthStatus.failure &&
