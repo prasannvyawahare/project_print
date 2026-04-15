@@ -38,7 +38,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
 
   Future<void> _openConfigureAndSave({PrintDocument? targetItem}) async {
     final state = _flowBloc.state;
-    if (state.files.isEmpty) {
+    if (targetItem == null && state.files.isEmpty) {
       return;
     }
 

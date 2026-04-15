@@ -12,11 +12,13 @@ import '../models/auth_user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<AuthUserModel> signInWithGoogle();
-  Future<void> verifyAndSaveUser({
+  Future<String> verifyAndSaveUser({
     required String email,
     required String mobile,
     required String authToken,
   });
+  Future<bool> checkStorageExists();
+  Future<void> createStorage(String userId);
   Future<void> signInWithApple();
   Future<void> signOut();
 }
@@ -96,7 +98,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<void> verifyAndSaveUser({
+  Future<String> verifyAndSaveUser({
     required String email,
     required String mobile,
     required String authToken,
@@ -118,7 +120,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
 
       final user = AuthUserModel(email: email, mobile: mobile);
-      await _dioClient.post(
+      final response = await _dioClient.post(
         path: ApiConstants.verifyAndSaveUserPath,
         data: user.toVerifyPayload(mobileNumber: trimmedMobile),
         headers: {
@@ -126,6 +128,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           'content-type': 'application/json',
         },
       );
+
+      final responseData = response.data;
+      final userId = (responseData is Map<String, dynamic>)
+          ? (responseData['data']?['id']?.toString() ?? '')
+          : '';
+
+      if (userId.isNotEmpty) {
+        await _temporaryAuthStore.saveUserId(userId);
+      }
+
+      return userId;
     } on DioException catch (error) {
       final data = error.response?.data;
       final backendMessage = data is Map<String, dynamic>
@@ -143,6 +156,57 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         rethrow;
       }
       throw ServerException(message: 'Failed to verify and save user');
+    }
+  }
+
+  @override
+  Future<bool> checkStorageExists() async {
+    try {
+      final response = await _dioClient.get(
+        path: ApiConstants.checkStorageExists,
+      );
+      final responseData = response.data;
+      if (responseData is Map<String, dynamic>) {
+        return responseData['success'] == true;
+      }
+      return false;
+    } on DioException catch (error) {
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+      throw ServerException(
+        message: backendMessage ?? error.message ?? 'Failed to check storage',
+        statusCode: error.response?.statusCode,
+      );
+    } catch (error, stackTrace) {
+      _logger.e('Check storage failed', error: error, stackTrace: stackTrace);
+      if (error is ServerException) rethrow;
+      throw ServerException(message: 'Failed to check storage');
+    }
+  }
+
+  @override
+  Future<void> createStorage(String userId) async {
+    try {
+      await _dioClient.post(
+        path: ApiConstants.createStorage,
+        data: {'id': userId},
+        headers: {'content-type': 'application/json'},
+      );
+    } on DioException catch (error) {
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+      throw ServerException(
+        message: backendMessage ?? error.message ?? 'Failed to create storage',
+        statusCode: error.response?.statusCode,
+      );
+    } catch (error, stackTrace) {
+      _logger.e('Create storage failed', error: error, stackTrace: stackTrace);
+      if (error is ServerException) rethrow;
+      throw ServerException(message: 'Failed to create storage');
     }
   }
 

@@ -41,7 +41,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> verifyAndSaveUser({
+  Future<Either<Failure, String>> verifyAndSaveUser({
     required String email,
     required String mobile,
     required String authToken,
@@ -52,12 +52,12 @@ class AuthRepositoryImpl implements AuthRepository {
     }
 
     try {
-      await _remoteDataSource.verifyAndSaveUser(
+      final userId = await _remoteDataSource.verifyAndSaveUser(
         email: email,
         mobile: mobile,
         authToken: authToken,
       );
-      return const Right(unit);
+      return Right(userId);
     } on ServerException catch (error, stackTrace) {
       _logger.e(
         'Verify user server exception',
@@ -72,6 +72,60 @@ class AuthRepositoryImpl implements AuthRepository {
         stackTrace: stackTrace,
       );
       return const Left(ServerFailure('Unable to verify user details'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> checkStorageExists() async {
+    final hasConnection = await _networkInfo.isConnected;
+    if (!hasConnection) {
+      return const Left(ConnectionFailure('No internet connection'));
+    }
+
+    try {
+      final exists = await _remoteDataSource.checkStorageExists();
+      return Right(exists);
+    } on ServerException catch (error, stackTrace) {
+      _logger.e(
+        'Check storage exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return Left(ServerFailure(error.message));
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Check storage unknown exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const Left(ServerFailure('Unable to check storage'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Unit>> createStorage(String userId) async {
+    final hasConnection = await _networkInfo.isConnected;
+    if (!hasConnection) {
+      return const Left(ConnectionFailure('No internet connection'));
+    }
+
+    try {
+      await _remoteDataSource.createStorage(userId);
+      return const Right(unit);
+    } on ServerException catch (error, stackTrace) {
+      _logger.e(
+        'Create storage exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return Left(ServerFailure(error.message));
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Create storage unknown exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const Left(ServerFailure('Unable to create storage'));
     }
   }
 

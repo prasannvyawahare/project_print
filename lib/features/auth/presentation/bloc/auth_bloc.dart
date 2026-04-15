@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/usecases/check_storage_exists.dart';
+import '../../domain/usecases/create_storage.dart';
 import '../../domain/usecases/sign_in_with_apple.dart';
 import '../../domain/usecases/sign_in_with_google.dart';
 import '../../domain/usecases/sign_out.dart';
@@ -12,10 +14,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required SignInWithGoogle signInWithGoogle,
     required SignInWithApple signInWithApple,
     required VerifyAndSaveUser verifyAndSaveUser,
+    required CheckStorageExists checkStorageExists,
+    required CreateStorage createStorage,
     required SignOut signOut,
   }) : _signInWithGoogle = signInWithGoogle,
        _signInWithApple = signInWithApple,
        _verifyAndSaveUser = verifyAndSaveUser,
+       _checkStorageExists = checkStorageExists,
+       _createStorage = createStorage,
        _signOut = signOut,
        super(const AuthState()) {
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
@@ -27,7 +33,57 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final SignInWithGoogle _signInWithGoogle;
   final SignInWithApple _signInWithApple;
   final VerifyAndSaveUser _verifyAndSaveUser;
+  final CheckStorageExists _checkStorageExists;
+  final CreateStorage _createStorage;
   final SignOut _signOut;
+
+  /// Checks if user storage exists and creates it if not.
+  /// Stays in loading state throughout; emits success or failure at the end.
+  Future<void> _ensureStorageReady(
+    String userId,
+    Emitter<AuthState> emit,
+  ) async {
+    final storageResult = await _checkStorageExists();
+
+    await storageResult.fold(
+      (failure) async => emit(
+        state.copyWith(
+          status: AuthStatus.failure,
+          errorMessage: failure.message,
+          nextStep: AuthNextStep.none,
+        ),
+      ),
+      (exists) async {
+        if (exists) {
+          emit(
+            state.copyWith(
+              status: AuthStatus.success,
+              nextStep: AuthNextStep.none,
+            ),
+          );
+          return;
+        }
+
+        // Storage doesn't exist — create it.
+        final createResult = await _createStorage(userId);
+        createResult.fold(
+          (failure) => emit(
+            state.copyWith(
+              status: AuthStatus.failure,
+              errorMessage: failure.message,
+              nextStep: AuthNextStep.none,
+            ),
+          ),
+          (_) => emit(
+            state.copyWith(
+              status: AuthStatus.success,
+              nextStep: AuthNextStep.none,
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _onGoogleSignInRequested(
     AuthGoogleSignInRequested event,
@@ -82,20 +138,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           ),
         );
 
-        verifyResult.fold(
-          (failure) => emit(
+        await verifyResult.fold(
+          (failure) async => emit(
             state.copyWith(
               status: AuthStatus.failure,
               errorMessage: failure.message,
               nextStep: AuthNextStep.none,
             ),
           ),
-          (_) => emit(
-            state.copyWith(
-              status: AuthStatus.success,
-              nextStep: AuthNextStep.none,
-            ),
-          ),
+          (userId) async => _ensureStorageReady(userId, emit),
         );
       },
     );
@@ -171,23 +222,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       ),
     );
 
-    result.fold(
-      (failure) => emit(
+    await result.fold(
+      (failure) async => emit(
         state.copyWith(
           status: AuthStatus.failure,
           errorMessage: failure.message,
           nextStep: AuthNextStep.none,
         ),
       ),
-      (_) => emit(
-        state.copyWith(
-          status: AuthStatus.success,
-          errorMessage: '',
-          pendingEmail: '',
-          pendingAuthToken: '',
-          nextStep: AuthNextStep.none,
-        ),
-      ),
+      (userId) async => _ensureStorageReady(userId, emit),
     );
   }
 

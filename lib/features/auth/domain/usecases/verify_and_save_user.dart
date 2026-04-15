@@ -9,7 +9,7 @@ class VerifyAndSaveUser {
 
   final AuthRepository _repository;
 
-  Future<Either<Failure, Unit>> call(VerifyAndSaveUserParams params) {
+  Future<Either<Failure, String>> call(VerifyAndSaveUserParams params) {
     return _repository.verifyAndSaveUser(
       email: params.email,
       mobile: params.mobile,
