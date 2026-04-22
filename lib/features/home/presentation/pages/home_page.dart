@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../app/router/app_router.dart';
+import '../../../../core/di/injection.dart';
+import '../../../auth/domain/usecases/sign_out.dart';
+import '../../domain/entities/print_category_entity.dart';
 import '../../../upload/presentation/pages/upload_documents_page.dart'
     show UploadDocumentsPage;
 import '../bloc/home_bloc.dart';
 import '../bloc/home_event.dart';
 import '../bloc/home_state.dart';
+
+double _screenScale(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  final widthScale = (size.width / 390).clamp(0.82, 1.0);
+  final heightScale = (size.height / 844).clamp(0.82, 1.0);
+  return (widthScale * 0.7 + heightScale * 0.3).toDouble();
+}
+
+double _r(BuildContext context, double value) => value * _screenScale(context);
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -24,9 +37,33 @@ class _HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<_HomeView> {
+  bool _isLoggingOut = false;
+
   void _openUploadDocuments() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const UploadDocumentsPage()),
+    );
+  }
+
+  Future<void> _logout() async {
+    if (_isLoggingOut) return;
+
+    setState(() => _isLoggingOut = true);
+    final result = await sl<SignOut>()();
+    if (!mounted) return;
+    setState(() => _isLoggingOut = false);
+
+    result.fold(
+      (failure) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text(failure.message)));
+      },
+      (_) {
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRouter.auth, (route) => false);
+      },
     );
   }
 
@@ -46,6 +83,7 @@ class _HomeViewState extends State<_HomeView> {
     const accent = Color(0xFF6233DD);
     const mutedText = Color(0xFF9A95A8);
     const primaryText = Color(0xFF242230);
+    final compact = _screenScale(context);
 
     return Scaffold(
       backgroundColor: pageBackground,
@@ -66,30 +104,37 @@ class _HomeViewState extends State<_HomeView> {
               children: [
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                  padding: EdgeInsets.fromLTRB(
+                    _r(context, 12),
+                    _r(context, 8),
+                    _r(context, 12),
+                    _r(context, 10),
+                  ),
                   child: Row(
                     children: [
                       IconButton(
                         onPressed: () {},
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: _r(context, 20),
+                        ),
                         color: accent,
                       ),
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'PrintHub',
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: _r(context, 20),
                             fontWeight: FontWeight.w700,
                             color: accent,
                           ),
                         ),
                       ),
                       IconButton(
-                        onPressed: () {
-                          context.read<HomeBloc>().add(const HomeRequested());
-                        },
-                        icon: const Icon(Icons.notifications_none_rounded),
+                        onPressed: _isLoggingOut ? null : _logout,
+                        icon: Icon(Icons.logout_rounded, size: _r(context, 22)),
                         color: accent,
+                        tooltip: 'Logout',
                       ),
                     ],
                   ),
@@ -98,94 +143,106 @@ class _HomeViewState extends State<_HomeView> {
                   const LinearProgressIndicator(minHeight: 2),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+                    padding: EdgeInsets.fromLTRB(
+                      _r(context, 18),
+                      _r(context, 18),
+                      _r(context, 18),
+                      _r(context, 16),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'OVERVIEW',
                           style: TextStyle(
-                            fontSize: 34,
+                            fontSize: _r(context, 26),
                             fontWeight: FontWeight.w300,
                             letterSpacing: 1.1,
                             color: Color(0xFF494652),
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        const Text(
+                        SizedBox(height: _r(context, 4)),
+                        Text(
                           'Hi, Alex👋',
                           style: TextStyle(
-                            fontSize: 50,
+                            fontSize: _r(context, 38),
                             fontWeight: FontWeight.w700,
                             color: primaryText,
                             height: 1.05,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: _r(context, 4)),
                         Text(
                           greetingSubtitle,
                           style: TextStyle(
                             color: state.status == HomeStatus.failure
                                 ? Colors.red.shade600
                                 : mutedText,
-                            fontSize: 15,
+                            fontSize: _r(context, 13.5),
                           ),
                         ),
-                        const SizedBox(height: 22),
+                        SizedBox(height: _r(context, 16)),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: _r(context, 12),
+                            vertical: _r(context, 10),
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEFEBF7),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(
+                              _r(context, 12),
+                            ),
                           ),
-                          child: const Row(
+                          child: Row(
                             children: [
                               Icon(
                                 Icons.search_rounded,
                                 color: Color(0xFF8F8AA0),
-                                size: 26,
+                                size: _r(context, 22),
                               ),
-                              SizedBox(width: 10),
+                              SizedBox(width: _r(context, 8)),
                               Expanded(
                                 child: Text(
                                   'Upload or search document',
                                   style: TextStyle(
                                     color: Color(0xFFABA6B7),
-                                    fontSize: 17,
+                                    fontSize: _r(context, 14),
                                   ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 28),
+                        SizedBox(height: _r(context, 20)),
                         const _PriorityCard(),
-                        const SizedBox(height: 30),
-                        const Text(
-                          'Print Services',
+                        SizedBox(height: _r(context, 20)),
+                        Text(
+                          'Print Categories',
                           style: TextStyle(
-                            fontSize: 38,
+                            fontSize: _r(context, 25),
                             fontWeight: FontWeight.w700,
                             color: primaryText,
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        _ServicesGrid(onPrintTap: _openUploadDocuments),
-                        const SizedBox(height: 26),
+                        SizedBox(height: _r(context, 12)),
+                        _ServicesGrid(
+                          categories: state.categories,
+                          onPrintTap: _openUploadDocuments,
+                        ),
+                        SizedBox(height: _r(context, 18)),
                         GestureDetector(
                           onTap: _openUploadDocuments,
                           child: Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 32,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: _r(context, 14),
+                              vertical: _r(context, 22),
                             ),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(28),
+                              borderRadius: BorderRadius.circular(
+                                _r(context, 24),
+                              ),
                               border: Border.all(
                                 color: const Color(0xFFCBC4DD),
                                 style: BorderStyle.solid,
@@ -195,33 +252,33 @@ class _HomeViewState extends State<_HomeView> {
                             child: Column(
                               children: [
                                 Container(
-                                  width: 74,
-                                  height: 74,
+                                  width: _r(context, 60),
+                                  height: _r(context, 60),
                                   decoration: const BoxDecoration(
                                     color: Color(0xFFE3DAFB),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.cloud_upload_rounded,
                                     color: accent,
-                                    size: 36,
+                                    size: _r(context, 30),
                                   ),
                                 ),
-                                const SizedBox(height: 22),
-                                const Text(
+                                SizedBox(height: _r(context, 14)),
+                                Text(
                                   'Upload Document',
                                   style: TextStyle(
-                                    fontSize: 20,
+                                    fontSize: _r(context, 17),
                                     fontWeight: FontWeight.w700,
                                     color: primaryText,
                                   ),
                                 ),
-                                const SizedBox(height: 10),
-                                const Text(
+                                SizedBox(height: _r(context, 8)),
+                                Text(
                                   'PDF, DOCX or Images up to 50MB',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: _r(context, 13),
                                     color: Color(0xFF646074),
                                   ),
                                 ),
@@ -229,7 +286,7 @@ class _HomeViewState extends State<_HomeView> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: _r(context, 16)),
                       ],
                     ),
                   ),
@@ -241,14 +298,36 @@ class _HomeViewState extends State<_HomeView> {
       ),
       bottomNavigationBar: Container(
         color: pageBackground,
-        padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
+        padding: EdgeInsets.fromLTRB(
+          _r(context, 12),
+          _r(context, 4),
+          _r(context, 12),
+          _r(context, 10),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: const [
-            _BottomItem(icon: Icons.home_rounded, label: 'HOME', active: true),
-            _BottomItem(icon: Icons.cloud_upload_outlined, label: 'UPLOAD'),
-            _BottomItem(icon: Icons.description_outlined, label: 'ORDERS'),
-            _BottomItem(icon: Icons.person_outline, label: 'PROFILE'),
+          children: [
+            _BottomItem(
+              icon: Icons.home_rounded,
+              label: 'HOME',
+              active: true,
+              compact: compact,
+            ),
+            _BottomItem(
+              icon: Icons.cloud_upload_outlined,
+              label: 'UPLOAD',
+              compact: compact,
+            ),
+            _BottomItem(
+              icon: Icons.description_outlined,
+              label: 'ORDERS',
+              compact: compact,
+            ),
+            _BottomItem(
+              icon: Icons.person_outline,
+              label: 'PROFILE',
+              compact: compact,
+            ),
           ],
         ),
       ),
@@ -261,11 +340,17 @@ class _PriorityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+      padding: EdgeInsets.fromLTRB(
+        20 * compact,
+        18 * compact,
+        20 * compact,
+        18 * compact,
+      ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24 * compact),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -282,56 +367,60 @@ class _PriorityCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.timer_outlined, color: Colors.white, size: 22),
-              SizedBox(width: 8),
+              Icon(
+                Icons.timer_outlined,
+                color: Colors.white,
+                size: 18 * compact,
+              ),
+              SizedBox(width: 8 * compact),
               Text(
                 'PRIORITY SERVICE',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 17,
+                  fontSize: 13.5 * compact,
                   letterSpacing: 2,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          const Text(
+          SizedBox(height: 12 * compact),
+          Text(
             '15-minute\nexpress\ndelivery',
             style: TextStyle(
               color: Colors.white,
               height: 1.15,
-              fontSize: 52,
+              fontSize: 38 * compact,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 8 * compact),
           Text(
             'Fastest print-to-door in the city.',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 22,
+              fontSize: 16 * compact,
             ),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 12 * compact),
           Row(
             children: [
               SizedBox(
-                height: 52,
+                height: 44 * compact,
                 child: FilledButton(
                   onPressed: () {},
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: const Color(0xFF3E2EC8),
-                    textStyle: const TextStyle(
-                      fontSize: 16,
+                    textStyle: TextStyle(
+                      fontSize: 14 * compact,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8 * compact),
                     child: Text('Track Live'),
                   ),
                 ),
@@ -340,7 +429,7 @@ class _PriorityCard extends StatelessWidget {
               Icon(
                 Icons.bolt_rounded,
                 color: Colors.white.withValues(alpha: 0.2),
-                size: 86,
+                size: 62 * compact,
               ),
             ],
           ),
@@ -351,130 +440,133 @@ class _PriorityCard extends StatelessWidget {
 }
 
 class _ServicesGrid extends StatelessWidget {
-  const _ServicesGrid({required this.onPrintTap});
+  const _ServicesGrid({required this.categories, required this.onPrintTap});
 
+  final List<PrintCategoryEntity> categories;
   final VoidCallback onPrintTap;
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    if (categories.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(16 * compact),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20 * compact),
+        ),
+        child: Text(
+          'No print categories available yet.',
+          style: TextStyle(
+            color: const Color(0xFF5D586B),
+            fontSize: 14 * compact,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
     return GridView.count(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
       crossAxisCount: 2,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
+      mainAxisSpacing: 12 * compact,
+      crossAxisSpacing: 12 * compact,
       childAspectRatio: 0.95,
-      children: [
-        _ServiceTile(
-          icon: Icons.print_outlined,
-          title: 'Black & White\nPrint',
-          subtitle: 'Starting at\n\$0.05',
-          background: Color(0xFFFFFFFF),
-          iconTint: Color(0xFF6334DC),
-          titleColor: Color(0xFF252230),
-          subtitleColor: Color(0xFF4A4657),
+      children: List.generate(categories.length, (index) {
+        final category = categories[index];
+        return _ServiceTile(
+          category: category,
+          icon: _resolveCategoryIcon(category.printType),
+          background: _resolveTileColor(index),
+          titleColor: _resolveTitleColor(index),
+          subtitleColor: _resolveSubtitleColor(index),
           onTap: onPrintTap,
-        ),
-        _ServiceTile(
-          icon: Icons.palette_outlined,
-          title: 'Color Print',
-          subtitle: 'High-fidelity',
-          background: Color(0xFF5B38D0),
-          iconTint: Color(0xFFE6DAFF),
-          titleColor: Color(0xFFECE6FF),
-          subtitleColor: Color(0xFFD6CCF7),
-          onTap: onPrintTap,
-        ),
-        _ServiceTile(
-          icon: Icons.menu_book_outlined,
-          title: 'Spiral Binding',
-          subtitle: 'Professional\nfinish',
-          background: Color(0xFFE4DEEF),
-          iconTint: Color(0xFF48515D),
-          titleColor: Color(0xFF272430),
-          subtitleColor: Color(0xFF4F4A5D),
-          onTap: onPrintTap,
-        ),
-        _ServiceTile(
-          icon: Icons.grid_view_rounded,
-          title: 'Poster\nPrinting',
-          subtitle: 'Large format',
-          background: Color(0xFFFFFFFF),
-          iconTint: Color(0xFF1E5BE0),
-          titleColor: Color(0xFF24222B),
-          subtitleColor: Color(0xFF4E495A),
-          onTap: onPrintTap,
-        ),
-      ],
+        );
+      }),
     );
   }
 }
 
 class _ServiceTile extends StatelessWidget {
   const _ServiceTile({
+    required this.category,
     required this.icon,
-    required this.title,
-    required this.subtitle,
     required this.background,
-    required this.iconTint,
     required this.titleColor,
     required this.subtitleColor,
     this.onTap,
   });
 
+  final PrintCategoryEntity category;
   final IconData icon;
-  final String title;
-  final String subtitle;
   final Color background;
-  final Color iconTint;
   final Color titleColor;
   final Color subtitleColor;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(30),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(
-                    alpha: background.computeLuminance() < 0.4 ? 0.16 : 0.75,
+    final compact = _screenScale(context);
+    return SizedBox(
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(24 * compact),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24 * compact),
+          onTap: onTap,
+          child: Padding(
+            padding: EdgeInsets.all(12 * compact),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: background.computeLuminance() < 0.4
+                        ? Colors.white.withValues(
+                            alpha: 0.15,
+                          ) // light overlay for dark bg
+                        : Colors.black.withValues(
+                            alpha: 0.05,
+                          ), // dark overlay for light bg
+                    shape: BoxShape.circle,
                   ),
-                  shape: BoxShape.circle,
+                  child: ClipOval(
+                    child: _AvatarIcon(
+                      avatarUrl: category.avatar,
+                      fallbackIcon: icon,
+                      iconColor: background.computeLuminance() < 0.4
+                          ? const Color(0xFFE6DAFF)
+                          : const Color(0xFF6334DC),
+                      compact: compact,
+                    ),
+                  ),
                 ),
-                child: Icon(icon, color: iconTint, size: 28),
-              ),
-              const Spacer(),
-              Text(
-                title,
-                style: TextStyle(
-                  color: titleColor,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
+                const Spacer(),
+                Text(
+                  category.printType,
+                  style: TextStyle(
+                    color: titleColor,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  color: subtitleColor,
-                  fontSize: 17,
-                  height: 1.25,
+                SizedBox(height: 6 * compact),
+                Text(
+                  'Rate: Rs. ${category.rate}',
+                  style: TextStyle(
+                    color: subtitleColor,
+                    fontSize: 13 * compact,
+                    height: 1.25,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -482,15 +574,99 @@ class _ServiceTile extends StatelessWidget {
   }
 }
 
+class _AvatarIcon extends StatelessWidget {
+  const _AvatarIcon({
+    required this.avatarUrl,
+    required this.fallbackIcon,
+    required this.iconColor,
+    required this.compact,
+  });
+
+  final String avatarUrl;
+  final IconData fallbackIcon;
+  final Color iconColor;
+  final double compact;
+
+  @override
+  Widget build(BuildContext context) {
+    if (avatarUrl.isEmpty) {
+      return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
+    }
+
+    return Image.network(
+      avatarUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+        return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
+      },
+    );
+  }
+}
+
+IconData _resolveCategoryIcon(String printType) {
+  final normalized = printType.toLowerCase();
+  if (normalized.contains('color')) {
+    return Icons.palette_outlined;
+  }
+  if (normalized.contains('lamination')) {
+    return Icons.layers_outlined;
+  }
+  if (normalized.contains('jambo') || normalized.contains('poster')) {
+    return Icons.view_agenda_outlined;
+  }
+  if (normalized.contains('black and white')) {
+    return Icons.print_outlined;
+  }
+  return Icons.description_outlined;
+}
+
+Color _resolveTileColor(int index) {
+  const palette = <Color>[
+    Color(0xFFFFFFFF),
+    Color(0xFF5B38D0),
+    Color(0xFFE4DEEF),
+    Color(0xFFFFFFFF),
+  ];
+  return palette[index % palette.length];
+}
+
+Color _resolveTitleColor(int index) {
+  const palette = <Color>[
+    Color(0xFF252230),
+    Color(0xFFECE6FF),
+    Color(0xFF272430),
+    Color(0xFF24222B),
+  ];
+  return palette[index % palette.length];
+}
+
+Color _resolveSubtitleColor(int index) {
+  const palette = <Color>[
+    Color(0xFF4A4657),
+    Color(0xFFD6CCF7),
+    Color(0xFF4F4A5D),
+    Color(0xFF4E495A),
+  ];
+  return palette[index % palette.length];
+}
+
 class _BottomItem extends StatelessWidget {
   const _BottomItem({
     required this.icon,
     required this.label,
+    required this.compact,
     this.active = false,
   });
 
   final IconData icon;
   final String label;
+  final double compact;
   final bool active;
 
   @override
@@ -499,22 +675,26 @@ class _BottomItem extends StatelessWidget {
     final inactiveColor = const Color(0xFF99A0B5);
 
     return Container(
-      width: 92,
-      height: 64,
+      width: 80 * compact,
+      height: 56 * compact,
       decoration: BoxDecoration(
         color: active ? const Color(0xFFE8E2FA) : Colors.transparent,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24 * compact),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 24, color: active ? activeColor : inactiveColor),
-          const SizedBox(height: 4),
+          Icon(
+            icon,
+            size: 20 * compact,
+            color: active ? activeColor : inactiveColor,
+          ),
+          SizedBox(height: 3 * compact),
           Text(
             label,
             style: TextStyle(
               color: active ? activeColor : inactiveColor,
-              fontSize: 12,
+              fontSize: 10.5 * compact,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.1,
             ),

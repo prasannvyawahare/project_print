@@ -189,21 +189,21 @@ class _AuthPageState extends State<AuthPage> {
                         .clamp(AppDimensions.spacing18, AppDimensions.spacing24)
                         .toDouble();
                     final titleSize = (AppDimensions.spacing64 * scale)
-                        .clamp(AppDimensions.icon38, AppDimensions.spacing64)
+                        .clamp(AppDimensions.spacing30, AppDimensions.spacing48)
                         .toDouble();
                     final subtitleSize = (AppDimensions.spacing24 * scale)
-                        .clamp(AppDimensions.spacing16, AppDimensions.spacing24)
+                        .clamp(AppDimensions.spacing14, AppDimensions.spacing18)
                         .toDouble();
                     final socialButtonHeight = (AppDimensions.spacing86 * scale)
-                        .clamp(AppDimensions.spacing62, AppDimensions.spacing86)
+                        .clamp(AppDimensions.spacing48, AppDimensions.spacing64)
                         .toDouble();
                     final socialTextSize = (AppDimensions.spacing18 * scale)
-                        .clamp(AppDimensions.spacing16, AppDimensions.spacing22)
+                        .clamp(AppDimensions.spacing14, AppDimensions.spacing18)
                         .toDouble();
                     final circleSize = (AppDimensions.spacing165 * scale)
                         .clamp(
-                          AppDimensions.spacing112,
-                          AppDimensions.spacing165,
+                          AppDimensions.spacing92,
+                          AppDimensions.spacing124,
                         )
                         .toDouble();
 
@@ -211,330 +211,319 @@ class _AuthPageState extends State<AuthPage> {
                       children: [
                         _buildBackgroundShapes(scale),
                         SafeArea(
-                          child: SingleChildScrollView(
+                          child: Padding(
                             padding: EdgeInsets.symmetric(
-                              horizontal: AppDimensions.spacing28 * scale,
-                              vertical: AppDimensions.spacing16 * scale,
+                              horizontal: AppDimensions.spacing24 * scale,
+                              vertical: AppDimensions.spacing12 * scale,
                             ),
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minHeight: height - AppDimensions.spacing32,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.print_rounded,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.print_rounded,
+                                      color: AppColors.brandBlue,
+                                      size: logoSize,
+                                    ),
+                                    SizedBox(
+                                      width: AppDimensions.spacing8 * scale,
+                                    ),
+                                    Text(
+                                      AppConstants.appName,
+                                      style: TextStyle(
                                         color: AppColors.brandBlue,
-                                        size: logoSize,
-                                      ),
-                                      SizedBox(
-                                        width: AppDimensions.spacing8 * scale,
-                                      ),
-                                      Text(
-                                        AppConstants.appName,
-                                        style: TextStyle(
-                                          color: AppColors.brandBlue,
-                                          fontSize: brandSize,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      SizedBox(
-                                        width: 36,
-                                        height: 36,
-                                        child: IconButton(
-                                          tooltip: 'Temporary logout',
-                                          padding: EdgeInsets.zero,
-                                          visualDensity: VisualDensity.compact,
-                                          onPressed: isSigningIn
-                                              ? null
-                                              : () => context
-                                                    .read<AuthBloc>()
-                                                    .add(
-                                                      const AuthLogoutRequested(),
-                                                    ),
-                                          icon: const Icon(
-                                            Icons.logout,
-                                            size: 18,
-                                            color: AppColors.brandBlue,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(
-                                    height:
-                                        (isCompact
-                                            ? AppDimensions.spacing28
-                                            : AppDimensions.spacing54) *
-                                        scale,
-                                  ),
-                                  Align(
-                                    alignment: Alignment.center,
-                                    child: Container(
-                                      width: circleSize,
-                                      height: circleSize,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: AppGradients.authCircle,
-                                      ),
-                                      child: Icon(
-                                        Icons.bolt_rounded,
-                                        color: AppColors.white,
-                                        size: (AppDimensions.icon80 * scale)
-                                            .clamp(
-                                              AppDimensions.spacing52,
-                                              AppDimensions.icon80,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    height:
-                                        (isCompact
-                                            ? AppDimensions.spacing20
-                                            : AppDimensions.icon42) *
-                                        scale,
-                                  ),
-                                  Center(
-                                    child: Text.rich(
-                                      textAlign: TextAlign.center,
-                                      TextSpan(
-                                        style: TextStyle(
-                                          color: AppColors.headingDark,
-                                          fontSize: titleSize,
-                                          fontWeight: FontWeight.w800,
-                                          height: 0.95,
-                                        ),
-                                        children: const [
-                                          TextSpan(
-                                            text:
-                                                '${AppConstants.authWelcomeLine1}\n',
-                                          ),
-                                          TextSpan(
-                                            text: AppConstants.authWelcomeLine2,
-                                          ),
-                                          TextSpan(
-                                            text: AppConstants.appName,
-                                            style: TextStyle(
-                                              color: AppColors.brandBlue,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    height: AppDimensions.spacing12 * scale,
-                                  ),
-                                  Center(
-                                    child: Text(
-                                      AppConstants.authSubtitle,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: AppColors.bodyText,
-                                        fontSize: subtitleSize,
-                                        fontWeight: FontWeight.w500,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    height:
-                                        (isCompact
-                                            ? AppDimensions.spacing22
-                                            : AppDimensions.spacing34) *
-                                        scale,
-                                  ),
-                                  _SocialButton(
-                                    onPressed: isSigningIn
-                                        ? null
-                                        : () => context.read<AuthBloc>().add(
-                                            const AuthGoogleSignInRequested(),
-                                          ),
-                                    text: AppConstants.continueWithGoogle,
-                                    backgroundColor: AppColors.white,
-                                    textColor: AppColors.googleButtonText,
-                                    buttonHeight: socialButtonHeight,
-                                    textSize: socialTextSize,
-                                    iconSlotWidth:
-                                        (AppDimensions.spacing48 * scale).clamp(
-                                          AppDimensions.spacing36,
-                                          AppDimensions.spacing48,
-                                        ),
-                                    icon: Text(
-                                      'G',
-                                      style: TextStyle(
-                                        fontSize:
-                                            (AppDimensions.spacing44 * scale)
-                                                .clamp(
-                                                  AppDimensions.spacing28,
-                                                  AppDimensions.spacing44,
-                                                ),
-                                        height: 0.8,
-                                        color: AppColors.googleRed,
+                                        fontSize: brandSize,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(
-                                    height: AppDimensions.spacing12 * scale,
-                                  ),
-                                  _SocialButton(
-                                    onPressed: isSigningIn
-                                        ? null
-                                        : () => context.read<AuthBloc>().add(
-                                            const AuthAppleSignInRequested(),
-                                          ),
-                                    text: AppConstants.continueWithApple,
-                                    backgroundColor: AppColors.navy,
-                                    textColor: AppColors.white,
-                                    buttonHeight: socialButtonHeight,
-                                    textSize: socialTextSize,
-                                    iconSlotWidth:
-                                        (AppDimensions.spacing48 * scale).clamp(
-                                          AppDimensions.spacing36,
-                                          AppDimensions.spacing48,
+                                    const Spacer(),
+                                    SizedBox(
+                                      width: 32,
+                                      height: 32,
+                                      child: IconButton(
+                                        tooltip: 'Temporary logout',
+                                        padding: EdgeInsets.zero,
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: isSigningIn
+                                            ? null
+                                            : () =>
+                                                  context.read<AuthBloc>().add(
+                                                    const AuthLogoutRequested(),
+                                                  ),
+                                        icon: const Icon(
+                                          Icons.logout,
+                                          size: 16,
+                                          color: AppColors.brandBlue,
                                         ),
-                                    icon: Icon(
-                                      Icons.apple,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(
+                                  height:
+                                      (isCompact
+                                          ? AppDimensions.spacing16
+                                          : AppDimensions.spacing24) *
+                                      scale,
+                                ),
+                                Align(
+                                  alignment: Alignment.center,
+                                  child: Container(
+                                    width: circleSize,
+                                    height: circleSize,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: AppGradients.authCircle,
+                                    ),
+                                    child: Icon(
+                                      Icons.bolt_rounded,
                                       color: AppColors.white,
-                                      size: (AppDimensions.icon42 * scale)
+                                      size: (AppDimensions.icon80 * scale)
                                           .clamp(
-                                            AppDimensions.spacing28,
-                                            AppDimensions.icon42,
+                                            AppDimensions.spacing44,
+                                            AppDimensions.spacing62,
                                           ),
                                     ),
                                   ),
-                                  SizedBox(
-                                    height: AppDimensions.spacing14 * scale,
-                                  ),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: isSigningIn
-                                              ? null
-                                              : () => _continue(context),
-                                          style: OutlinedButton.styleFrom(
-                                            minimumSize: Size.fromHeight(
-                                              (AppDimensions.spacing54 * scale)
-                                                  .clamp(
-                                                    AppDimensions.spacing46,
-                                                    AppDimensions.spacing54,
-                                                  ),
-                                            ),
-                                            side: const BorderSide(
-                                              color: AppColors.brandBlue,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    AppDimensions.radius18,
-                                                  ),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            AppConstants.login,
-                                            style: TextStyle(
-                                              fontSize:
-                                                  (AppDimensions.spacing18 *
-                                                          scale)
-                                                      .clamp(
-                                                        AppDimensions.spacing14,
-                                                        AppDimensions.spacing18,
-                                                      ),
-                                            ),
-                                          ),
-                                        ),
+                                ),
+                                SizedBox(
+                                  height:
+                                      (isCompact
+                                          ? AppDimensions.spacing12
+                                          : AppDimensions.spacing16) *
+                                      scale,
+                                ),
+                                Center(
+                                  child: Text.rich(
+                                    textAlign: TextAlign.center,
+                                    TextSpan(
+                                      style: TextStyle(
+                                        color: AppColors.headingDark,
+                                        fontSize: titleSize,
+                                        fontWeight: FontWeight.w800,
+                                        height: 0.95,
                                       ),
-                                      SizedBox(
-                                        width: AppDimensions.spacing12 * scale,
-                                      ),
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: isSigningIn
-                                              ? null
-                                              : () => _continue(context),
-                                          style: ElevatedButton.styleFrom(
-                                            minimumSize: Size.fromHeight(
-                                              (AppDimensions.spacing54 * scale)
-                                                  .clamp(
-                                                    AppDimensions.spacing46,
-                                                    AppDimensions.spacing54,
-                                                  ),
-                                            ),
-                                            backgroundColor:
-                                                AppColors.brandBlue,
-                                            foregroundColor: AppColors.white,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    AppDimensions.radius18,
-                                                  ),
-                                            ),
-                                          ),
-                                          child: Text(
-                                            AppConstants.register,
-                                            style: TextStyle(
-                                              fontSize:
-                                                  (AppDimensions.spacing18 *
-                                                          scale)
-                                                      .clamp(
-                                                        AppDimensions.spacing14,
-                                                        AppDimensions.spacing18,
-                                                      ),
-                                            ),
-                                          ),
+                                      children: const [
+                                        TextSpan(
+                                          text:
+                                              '${AppConstants.authWelcomeLine1}\n',
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(
-                                    height: AppDimensions.spacing18 * scale,
-                                  ),
-                                  Center(
-                                    child: Column(
-                                      children: [
-                                        if (isSigningIn)
-                                          const Padding(
-                                            padding: EdgeInsets.only(
-                                              bottom: AppDimensions.spacing10,
-                                            ),
-                                            child: SizedBox(
-                                              width: AppDimensions.spacing24,
-                                              height: AppDimensions.spacing24,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth:
-                                                    AppDimensions.spacing2,
-                                              ),
-                                            ),
-                                          ),
-                                        _MiniIndicator(scale: scale),
-                                        SizedBox(
-                                          height:
-                                              AppDimensions.spacing10 * scale,
+                                        TextSpan(
+                                          text: AppConstants.authWelcomeLine2,
                                         ),
-                                        Text(
-                                          AppConstants.authFooter,
+                                        TextSpan(
+                                          text: AppConstants.appName,
                                           style: TextStyle(
-                                            color: AppColors.footerText,
-                                            fontSize: (15 * scale).clamp(
-                                              AppDimensions.spacing10,
-                                              AppDimensions.spacing15,
-                                            ),
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 2,
+                                            color: AppColors.brandBlue,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                                SizedBox(
+                                  height: AppDimensions.spacing30 * scale,
+                                ),
+                                Center(
+                                  child: Text(
+                                    AppConstants.authSubtitle,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppColors.bodyText,
+                                      fontSize: subtitleSize,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  height:
+                                      (isCompact
+                                          ? AppDimensions.spacing30
+                                          : AppDimensions.spacing40) *
+                                      scale,
+                                ),
+
+                                _SocialButton(
+                                  onPressed: isSigningIn
+                                      ? null
+                                      : () => context.read<AuthBloc>().add(
+                                          const AuthGoogleSignInRequested(),
+                                        ),
+                                  text: AppConstants.continueWithGoogle,
+                                  backgroundColor: AppColors.white,
+                                  textColor: AppColors.googleButtonText,
+                                  buttonHeight: socialButtonHeight,
+                                  textSize: socialTextSize,
+                                  iconSlotWidth:
+                                      (AppDimensions.spacing44 * scale).clamp(
+                                        AppDimensions.spacing34,
+                                        AppDimensions.spacing44,
+                                      ),
+                                  icon: Text(
+                                    'G',
+                                    style: TextStyle(
+                                      fontSize:
+                                          (AppDimensions.spacing36 * scale)
+                                              .clamp(
+                                                AppDimensions.spacing24,
+                                                AppDimensions.spacing36,
+                                              ),
+                                      height: 0.8,
+                                      color: AppColors.googleRed,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  height: AppDimensions.spacing10 * scale,
+                                ),
+                                _SocialButton(
+                                  onPressed: isSigningIn
+                                      ? null
+                                      : () => context.read<AuthBloc>().add(
+                                          const AuthAppleSignInRequested(),
+                                        ),
+                                  text: AppConstants.continueWithApple,
+                                  backgroundColor: AppColors.navy,
+                                  textColor: AppColors.white,
+                                  buttonHeight: socialButtonHeight,
+                                  textSize: socialTextSize,
+                                  iconSlotWidth:
+                                      (AppDimensions.spacing44 * scale).clamp(
+                                        AppDimensions.spacing34,
+                                        AppDimensions.spacing44,
+                                      ),
+                                  icon: Icon(
+                                    Icons.apple,
+                                    color: AppColors.white,
+                                    size: (AppDimensions.spacing34 * scale)
+                                        .clamp(
+                                          AppDimensions.spacing24,
+                                          AppDimensions.spacing34,
+                                        ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  height: AppDimensions.spacing56 * scale,
+                                ),
+                                const Spacer(),
+                                // Row(
+                                //   children: [
+                                //     Expanded(
+                                //       child: OutlinedButton(
+                                //         onPressed: isSigningIn
+                                //             ? null
+                                //             : () => _continue(context),
+                                //         style: OutlinedButton.styleFrom(
+                                //           minimumSize: Size.fromHeight(
+                                //             (AppDimensions.spacing46 * scale)
+                                //                 .clamp(
+                                //                   AppDimensions.spacing40,
+                                //                   AppDimensions.spacing46,
+                                //                 ),
+                                //           ),
+                                //           side: const BorderSide(
+                                //             color: AppColors.brandBlue,
+                                //           ),
+                                //           shape: RoundedRectangleBorder(
+                                //             borderRadius: BorderRadius.circular(
+                                //               AppDimensions.radius18,
+                                //             ),
+                                //           ),
+                                //         ),
+                                //         child: Text(
+                                //           AppConstants.login,
+                                //           style: TextStyle(
+                                //             fontSize:
+                                //                 (AppDimensions.spacing16 *
+                                //                         scale)
+                                //                     .clamp(
+                                //                       AppDimensions.spacing14,
+                                //                       AppDimensions.spacing16,
+                                //                     ),
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ),
+                                //     SizedBox(
+                                //       width: AppDimensions.spacing10 * scale,
+                                //     ),
+                                //     Expanded(
+                                //       child: ElevatedButton(
+                                //         onPressed: isSigningIn
+                                //             ? null
+                                //             : () => _continue(context),
+                                //         style: ElevatedButton.styleFrom(
+                                //           minimumSize: Size.fromHeight(
+                                //             (AppDimensions.spacing46 * scale)
+                                //                 .clamp(
+                                //                   AppDimensions.spacing40,
+                                //                   AppDimensions.spacing46,
+                                //                 ),
+                                //           ),
+                                //           backgroundColor: AppColors.brandBlue,
+                                //           foregroundColor: AppColors.white,
+                                //           shape: RoundedRectangleBorder(
+                                //             borderRadius: BorderRadius.circular(
+                                //               AppDimensions.radius18,
+                                //             ),
+                                //           ),
+                                //         ),
+                                //         child: Text(
+                                //           AppConstants.register,
+                                //           style: TextStyle(
+                                //             fontSize:
+                                //                 (AppDimensions.spacing16 *
+                                //                         scale)
+                                //                     .clamp(
+                                //                       AppDimensions.spacing14,
+                                //                       AppDimensions.spacing16,
+                                //                     ),
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ),
+                                //   ],
+                                // ),
+                                Center(
+                                  child: Column(
+                                    children: [
+                                      if (isSigningIn)
+                                        const Padding(
+                                          padding: EdgeInsets.only(
+                                            bottom: AppDimensions.spacing8,
+                                          ),
+                                          child: SizedBox(
+                                            width: AppDimensions.spacing20,
+                                            height: AppDimensions.spacing20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth:
+                                                  AppDimensions.spacing2,
+                                            ),
+                                          ),
+                                        ),
+                                      _MiniIndicator(scale: scale),
+                                      SizedBox(
+                                        height: AppDimensions.spacing8 * scale,
+                                      ),
+                                      Text(
+                                        AppConstants.authFooter,
+                                        style: TextStyle(
+                                          color: AppColors.footerText,
+                                          fontSize: (13 * scale).clamp(
+                                            AppDimensions.spacing10,
+                                            AppDimensions.spacing14,
+                                          ),
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 1.6,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
