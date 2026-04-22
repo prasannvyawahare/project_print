@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -74,14 +75,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
 
-      _logger.i('Using Google ID token for verify-and-save request');
+      final String? firebaseIdToken = await user?.getIdToken();
+      if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+        throw ServerException(
+          message: 'Failed to retrieve Firebase ID token.',
+        );
+      }
+
+      _logger.i('Using Firebase ID token for verify-and-save request');
 
       await _temporaryAuthStore.save(
         mobile: mobile?.trim() ?? '',
-        token: idToken,
+        token: firebaseIdToken,
       );
 
-      return AuthUserModel(email: email, mobile: mobile, authToken: idToken);
+      return AuthUserModel(email: email, mobile: mobile, authToken: firebaseIdToken);
     } on ServerException {
       rethrow;
     } on FirebaseAuthException catch (error) {
@@ -91,6 +99,30 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         stackTrace: error.stackTrace,
       );
       throw ServerException(message: error.message ?? 'Authentication failed');
+    } on GoogleSignInException catch (error, stackTrace) {
+      _logger.e(
+        'Google sign-in error: ${error.code}',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        throw ServerException(message: 'Sign-in was cancelled.');
+      }
+      throw ServerException(
+        message: 'Google sign-in failed (${error.code.name})',
+      );
+    } on PlatformException catch (error, stackTrace) {
+      _logger.e(
+        'Google sign-in platform error: ${error.code}',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error.code == 'sign_in_canceled') {
+        throw ServerException(message: 'Sign-in was cancelled.');
+      }
+      throw ServerException(
+        message: error.message ?? 'Google sign-in failed (${error.code})',
+      );
     } catch (error, stackTrace) {
       _logger.e('Google sign-in error', error: error, stackTrace: stackTrace);
       throw ServerException(message: 'Unable to sign in with Google');

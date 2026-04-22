@@ -33,12 +33,50 @@ lib/
 		- domain/
 		- presentation/
 
+## Flavors
+
+| Flavor | Package Name | Use |
+|--------|-------------|-----|
+| internal | `com.printhub.mobile.debug` | Local development |
+| dev | `com.printhub.mobile.dev` | Dev/staging environment |
+| prod | `com.printhub.mobile` | Production |
+
+### Run
+
+```bash
+flutter run --flavor internal
+flutter run --flavor dev
+flutter run --flavor prod
+```
+
+### Build APK
+
+```bash
+flutter build apk --flavor internal
+flutter build apk --flavor dev
+flutter build apk --flavor prod
+```
+
+### Build Release
+
+```bash
+flutter build apk --flavor internal --release
+flutter build apk --flavor dev --release
+flutter build apk --flavor prod --release
+```
+
+### Build App Bundle (Play Store)
+
+```bash
+flutter build appbundle --flavor prod
+```
+
 ## Run the Project
 
 1. Install dependencies:
 	 flutter pub get
 2. Run app:
-	 flutter run
+	 flutter run --flavor internal
 3. Analyze code:
 	 flutter analyze
 4. Run tests:

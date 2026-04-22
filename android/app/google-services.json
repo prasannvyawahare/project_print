@@ -1,41 +1,91 @@
 {
   "project_info": {
-    "project_number": "66047455338",
-    "project_id": "printhub-c8467",
-    "storage_bucket": "printhub-c8467.firebasestorage.app"
+    "project_number": "952760305739",
+    "project_id": "print-hub-452604",
+    "storage_bucket": "print-hub-452604.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:66047455338:android:83762ed3db93b132a99a13",
+        "mobilesdk_app_id": "1:952760305739:android:8432f79cafd216d05ea5ce",
         "android_client_info": {
-          "package_name": "com.example.project_print"
+          "package_name": "com.printhub.mobile"
         }
       },
       "oauth_client": [
         {
-          "client_id": "66047455338-qhdb267u7g9b5frh68l08emv1p8rmq59.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.project_print",
-            "certificate_hash": "aa169be5a37d2a6f7b396c72feb6557705cab2b8"
-          }
-        },
-        {
-          "client_id": "66047455338-s1v0r40192qmp7a2oehiboegb2ag71ia.apps.googleusercontent.com",
+          "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCZIpQs_t-PlaqD8-a0kwGB7MJn5zF_H74"
+          "current_key": "AIzaSyAQ4q-YG-eoFRbGdO1-SMztVv9Nmlwz1q0"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "66047455338-s1v0r40192qmp7a2oehiboegb2ag71ia.apps.googleusercontent.com",
+              "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:952760305739:android:1b17eefbe3ee62885ea5ce",
+        "android_client_info": {
+          "package_name": "com.printhub.mobile.debug"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQ4q-YG-eoFRbGdO1-SMztVv9Nmlwz1q0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:952760305739:android:0d51560b5d630ba95ea5ce",
+        "android_client_info": {
+          "package_name": "com.printhub.mobile.dev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAQ4q-YG-eoFRbGdO1-SMztVv9Nmlwz1q0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

@@ -42,7 +42,10 @@ Future<void> initDependencies() async {
       InternetConnectionChecker.createInstance,
     );
 
-  await sl<GoogleSignIn>().initialize();
+  await sl<GoogleSignIn>().initialize(
+    serverClientId:
+        '952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com',
+  );
 
   sl.registerLazySingleton<TemporaryAuthStore>(
     () => TemporaryAuthStore(preferences: sl<SharedPreferences>()),
