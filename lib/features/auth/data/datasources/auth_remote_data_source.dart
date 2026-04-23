@@ -107,7 +107,7 @@ Future<AuthUserModel> signInWithGoogle() async {
     _logger.i('=== AUTH TOKENS ===');
     _logger.i('Google ID token : ${googleAuth.idToken}');
     _logger.i('Firebase ID token: $firebaseIdToken');
-    _logger.i('==================');
+    _logger.i('==================+');
 
     await _temporaryAuthStore.save(
       mobile: mobile?.trim() ?? '',
