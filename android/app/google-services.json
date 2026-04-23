@@ -43,34 +43,13 @@
       },
       "oauth_client": [
         {
-          "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAQ4q-YG-eoFRbGdO1-SMztVv9Nmlwz1q0"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:952760305739:android:0d51560b5d630ba95ea5ce",
-        "android_client_info": {
-          "package_name": "com.printhub.mobile.dev"
-        }
-      },
-      "oauth_client": [
+          "client_id": "952760305739-tj4c4igu9bo6r878urbrq8cmlscc0ld3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.printhub.mobile.debug",
+            "certificate_hash": "e5c2726f385c17f3d32f53b7d0dad1ac4a9ab925"
+          }
+        },
         {
           "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
           "client_type": 3

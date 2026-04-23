@@ -35,6 +35,7 @@ class DioClient {
           if (token.isNotEmpty && !hasAuthorizationHeader) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          options.headers['x-client-platform'] = 'mobile';
           handler.next(options);
         },
       ),
