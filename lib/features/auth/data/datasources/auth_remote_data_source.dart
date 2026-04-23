@@ -43,59 +43,126 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final Logger _logger;
 
   @override
-  Future<AuthUserModel> signInWithGoogle() async {
-    try {
-      final GoogleSignInAccount account = await _googleSignIn.authenticate();
-      final GoogleSignInAuthentication googleAuth = account.authentication;
+Future<AuthUserModel> signInWithGoogle() async {
+  try {
+    await _googleSignIn.signOut();
 
-      final String? idToken = googleAuth.idToken?.trim();
-      _logger.i('Google sign-in successful, ID token obtained');
-      if (idToken == null || idToken.isEmpty) {
-        throw ServerException(
-          message: 'Google sign-in failed: missing account token.',
-        );
-      }
+    // Step 1 — Google Sign-In
+    final GoogleSignInAccount account =
+        await _googleSignIn.authenticate();
 
-      final OAuthCredential credential = GoogleAuthProvider.credential(
-        idToken: idToken,
+    final GoogleSignInAuthentication googleAuth =
+        account.authentication;
+
+    if (googleAuth.idToken == null) {
+      throw ServerException(
+        message: 'Google sign-in failed: missing ID token.',
       );
-
-      final userCredential = await _firebaseAuth.signInWithCredential(
-        credential,
-      );
-
-      final user = userCredential.user;
-      final String email = user?.email ?? account.email;
-      final String? mobile = user?.phoneNumber;
-
-      if (email.isEmpty) {
-        throw ServerException(
-          message: 'Google account email is not available.',
-        );
-      }
-
-      _logger.i('Using Google ID token for verify-and-save request');
-
-      await _temporaryAuthStore.save(
-        mobile: mobile?.trim() ?? '',
-        token: idToken,
-      );
-
-      return AuthUserModel(email: email, mobile: mobile, authToken: idToken);
-    } on ServerException {
-      rethrow;
-    } on FirebaseAuthException catch (error) {
-      _logger.e(
-        'Auth service error',
-        error: error,
-        stackTrace: error.stackTrace,
-      );
-      throw ServerException(message: error.message ?? 'Authentication failed');
-    } catch (error, stackTrace) {
-      _logger.e('Google sign-in error', error: error, stackTrace: stackTrace);
-      throw ServerException(message: 'Unable to sign in with Google');
     }
+
+    // Step 2 — Create Firebase Credential
+    final OAuthCredential credential =
+        GoogleAuthProvider.credential(
+      idToken: googleAuth.idToken,
+    );
+
+    // Step 3 — Firebase Sign-In
+    final userCredential =
+        await _firebaseAuth.signInWithCredential(
+      credential,
+    );
+
+    final user = userCredential.user;
+
+    if (user == null) {
+      throw ServerException(
+        message: 'Firebase user not available.',
+      );
+    }
+
+    final String email =
+        user.email ?? account.email;
+
+    final String? mobile =
+        user.phoneNumber;
+
+    if (email.isEmpty) {
+      throw ServerException(
+        message: 'Google account email not available.',
+      );
+    }
+
+    // Step 4 — Get Firebase ID Token
+    // getIdToken(true) force-refreshes so we always get a Firebase-issued
+    // JWT (aud = project ID), never the raw Google OpenID token.
+    final String? firebaseIdToken = await user.getIdToken(true);
+
+    if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+      throw ServerException(
+        message: 'Failed to retrieve Firebase ID token.',
+      );
+    }
+
+    _logger.i('=== AUTH TOKENS ===');
+    _logger.i('Google ID token : ${googleAuth.idToken}');
+    _logger.i('Firebase ID token: $firebaseIdToken');
+    _logger.i('==================+');
+
+    await _temporaryAuthStore.save(
+      mobile: mobile?.trim() ?? '',
+      token: firebaseIdToken,
+    );
+
+    return AuthUserModel(
+      email: email,
+      mobile: mobile,
+      authToken: firebaseIdToken,
+    );
+
+  } on ServerException {
+    rethrow;
+  } on FirebaseAuthException catch (error) {
+    _logger.e(
+      'Firebase auth error',
+      error: error,
+      stackTrace: error.stackTrace,
+    );
+
+    throw ServerException(
+      message: error.message ?? 'Authentication failed',
+    );
+
+  } on GoogleSignInException catch (error, stackTrace) {
+    _logger.e(
+      'Google sign-in error: ${error.code}',
+      error: error,
+      stackTrace: stackTrace,
+    );
+
+    if (error.code ==
+        GoogleSignInExceptionCode.canceled) {
+      throw ServerException(
+        message: 'Sign-in was cancelled.',
+      );
+    }
+
+    throw ServerException(
+      message:
+          'Google sign-in failed (${error.code.name})',
+    );
+
+  } catch (error, stackTrace) {
+    _logger.e(
+      'Google sign-in error',
+      error: error,
+      stackTrace: stackTrace,
+    );
+
+    throw ServerException(
+      message: 'Unable to sign in with Google',
+    );
   }
+}
 
   @override
   Future<String> verifyAndSaveUser({

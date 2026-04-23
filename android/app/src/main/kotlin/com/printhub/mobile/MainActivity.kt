@@ -1,4 +1,4 @@
-package com.example.project_print
+package com.printhub.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 
