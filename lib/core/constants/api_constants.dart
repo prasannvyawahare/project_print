@@ -6,6 +6,7 @@ class ApiConstants {
 
   static const String checkStorageExists = 'user/storage-exists';
   static const String createStorage = 'user/create-storage';
+  static const String printTypePath = 'print-type/get';
 
   // Keep existing demo endpoint working with an absolute URL.
   static const String welcomePath =

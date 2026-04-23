@@ -70,25 +70,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
             final isCompact = height < AppDimensions.compactHeightBreakpoint;
 
             final titleSize = (AppDimensions.spacing52 * scale)
-                .clamp(AppDimensions.spacing36, AppDimensions.spacing52)
+                .clamp(AppDimensions.spacing30, AppDimensions.spacing46)
                 .toDouble();
             final descriptionSize = (AppDimensions.spacing22 * scale)
-                .clamp(AppDimensions.spacing16, AppDimensions.spacing22)
+                .clamp(AppDimensions.spacing14, AppDimensions.spacing18)
                 .toDouble();
             final buttonTextSize = (AppDimensions.spacing24 * scale)
-                .clamp(AppDimensions.spacing18, AppDimensions.spacing24)
+                .clamp(AppDimensions.spacing15, AppDimensions.spacing18)
                 .toDouble();
             final skipSize = (AppDimensions.spacing22 * scale)
-                .clamp(AppDimensions.spacing16, AppDimensions.spacing22)
+                .clamp(AppDimensions.spacing14, AppDimensions.spacing16)
                 .toDouble();
             final buttonHeight =
                 (isCompact
-                    ? AppDimensions.spacing64
-                    : AppDimensions.spacing82) *
+                    ? AppDimensions.spacing52
+                    : AppDimensions.spacing56) *
                 scale;
             final heroHeight = (height * (isCompact ? 0.36 : 0.44)).clamp(
-              AppDimensions.spacing230,
-              AppDimensions.spacing420,
+              AppDimensions.spacing190,
+              AppDimensions.spacing300,
             );
 
             return Padding(
@@ -100,7 +100,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
               child: Column(
                 children: [
-                  SizedBox(height: AppDimensions.spacing8 * scale),
+                  SizedBox(height: AppDimensions.spacing6 * scale),
                   Expanded(
                     child: PageView.builder(
                       controller: _pageController,
@@ -116,7 +116,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                               height: heroHeight,
                               scale: scale,
                             ),
-                            SizedBox(height: AppDimensions.spacing20 * scale),
+                            SizedBox(height: AppDimensions.spacing12 * scale),
                             Text(
                               step.title,
                               textAlign: TextAlign.center,
@@ -127,7 +127,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                                 height: 0.95,
                               ),
                             ),
-                            SizedBox(height: AppDimensions.spacing14 * scale),
+                            SizedBox(height: AppDimensions.spacing10 * scale),
                             Text(
                               step.description,
                               textAlign: TextAlign.center,
@@ -143,12 +143,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       },
                     ),
                   ),
-                  SizedBox(height: AppDimensions.spacing12 * scale),
+                  SizedBox(height: AppDimensions.spacing8 * scale),
                   _OnboardingIndicator(
                     index: _currentIndex,
                     count: _steps.length,
+                    scale: scale,
                   ),
-                  SizedBox(height: AppDimensions.spacing18 * scale),
+                  SizedBox(height: AppDimensions.spacing12 * scale),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(
@@ -191,7 +192,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ),
                     ),
                   ),
-                  SizedBox(height: AppDimensions.spacing8 * scale),
+                  SizedBox(height: AppDimensions.spacing6 * scale),
                   TextButton(
                     onPressed: _skip,
                     child: Text(
@@ -214,10 +215,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
 }
 
 class _OnboardingIndicator extends StatelessWidget {
-  const _OnboardingIndicator({required this.index, required this.count});
+  const _OnboardingIndicator({
+    required this.index,
+    required this.count,
+    required this.scale,
+  });
 
   final int index;
   final int count;
+  final double scale;
 
   @override
   Widget build(BuildContext context) {
@@ -227,11 +233,22 @@ class _OnboardingIndicator extends StatelessWidget {
         final isActive = i == index;
         return AnimatedContainer(
           duration: AppDurations.onboardingIndicatorAnimation,
-          margin: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.spacing6,
+          margin: EdgeInsets.symmetric(
+            horizontal: AppDimensions.spacing6 * scale,
           ),
-          width: isActive ? AppDimensions.spacing62 : AppDimensions.spacing22,
-          height: AppDimensions.spacing12,
+          width: isActive
+              ? (AppDimensions.spacing46 * scale).clamp(
+                  AppDimensions.spacing34,
+                  AppDimensions.spacing46,
+                )
+              : (AppDimensions.spacing16 * scale).clamp(
+                  AppDimensions.spacing12,
+                  AppDimensions.spacing16,
+                ),
+          height: (AppDimensions.spacing8 * scale).clamp(
+            AppDimensions.spacing6,
+            AppDimensions.spacing8,
+          ),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppDimensions.radius99),
             gradient: isActive ? AppGradients.onboardingIndicatorActive : null,

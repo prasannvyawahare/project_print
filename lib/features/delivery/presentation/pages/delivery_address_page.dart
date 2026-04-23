@@ -4,6 +4,15 @@ import 'package:flutter/material.dart';
 
 import '../../../print/domain/entities/print_order_data.dart';
 
+double _screenScale(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  final widthScale = (size.width / 390).clamp(0.82, 1.0);
+  final heightScale = (size.height / 844).clamp(0.82, 1.0);
+  return (widthScale * 0.7 + heightScale * 0.3).toDouble();
+}
+
+double _r(BuildContext context, double value) => value * _screenScale(context);
+
 class DeliveryAddressPage extends StatefulWidget {
   const DeliveryAddressPage({super.key, required this.initialOrder});
 
@@ -178,19 +187,27 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
           children: [
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              padding: EdgeInsets.fromLTRB(
+                _r(context, 12),
+                _r(context, 8),
+                _r(context, 12),
+                _r(context, 10),
+              ),
               child: Row(
                 children: [
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: _r(context, 20),
+                    ),
                     color: const Color(0xFF1E2433),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Delivery Address',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: _r(context, 19),
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF1F1F2E),
                       ),
@@ -198,7 +215,10 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                   ),
                   IconButton(
                     onPressed: () {},
-                    icon: const Icon(Icons.notifications_none_rounded),
+                    icon: Icon(
+                      Icons.notifications_none_rounded,
+                      size: _r(context, 22),
+                    ),
                     color: const Color(0xFF1E2433),
                   ),
                 ],
@@ -206,31 +226,36 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                padding: EdgeInsets.fromLTRB(
+                  _r(context, 18),
+                  _r(context, 16),
+                  _r(context, 18),
+                  _r(context, 16),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'STEP 02',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: _r(context, 13),
                         fontWeight: FontWeight.w800,
                         letterSpacing: 3,
                         color: accent,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: _r(context, 12)),
                     _MapCard(
                       isConfirming: !_order.isLocationConfirmed,
                       onChangeTap: _selectLocationFromMap,
                     ),
-                    const SizedBox(height: 22),
+                    SizedBox(height: _r(context, 16)),
                     Row(
                       children: [
-                        const Text(
+                        Text(
                           'Saved Locations',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: _r(context, 20),
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF21202D),
                           ),
@@ -238,10 +263,11 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                         const Spacer(),
                         TextButton(
                           onPressed: _addOrUpdateAddress,
-                          child: const Text(
+                          child: Text(
                             '+ ADD NEW',
                             style: TextStyle(
                               color: accent,
+                              fontSize: _r(context, 12),
                               fontWeight: FontWeight.w800,
                               letterSpacing: 1.2,
                             ),
@@ -249,7 +275,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(height: _r(context, 8)),
                     _AddressCard(
                       type: DeliveryAddressType.home,
                       icon: Icons.home_filled,
@@ -260,7 +286,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                           DeliveryAddressType.home,
                       onTap: () => _selectAddressType(DeliveryAddressType.home),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _r(context, 10)),
                     _AddressCard(
                       type: DeliveryAddressType.office,
                       icon: Icons.work_outline_rounded,
@@ -272,16 +298,16 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                       onTap: () =>
                           _selectAddressType(DeliveryAddressType.office),
                     ),
-                    const SizedBox(height: 26),
-                    const Text(
+                    SizedBox(height: _r(context, 18)),
+                    Text(
                       'Delivery Speed',
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: _r(context, 20),
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF21202D),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: _r(context, 8)),
                     _SpeedCard(),
                   ],
                 ),
@@ -292,66 +318,74 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       ),
       bottomNavigationBar: Container(
         color: Colors.white.withValues(alpha: 0.65),
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+        padding: EdgeInsets.fromLTRB(
+          _r(context, 18),
+          _r(context, 12),
+          _r(context, 18),
+          _r(context, 16),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
-              children: const [
+              children: [
                 Text(
                   'Total Delivery Cost',
-                  style: TextStyle(fontSize: 20, color: Color(0xFF3B3949)),
+                  style: TextStyle(
+                    fontSize: _r(context, 16),
+                    color: Color(0xFF3B3949),
+                  ),
                 ),
                 Spacer(),
                 Text(
                   '\$12.50',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: _r(context, 22),
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1E1B27),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: _r(context, 10)),
             SizedBox(
               width: double.infinity,
-              height: 68,
+              height: _r(context, 54),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(36),
+                  borderRadius: BorderRadius.circular(_r(context, 30)),
                   gradient: const LinearGradient(
                     colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: const Color(0xFF1F31B6).withValues(alpha: 0.24),
-                      blurRadius: 18,
-                      offset: const Offset(0, 9),
+                      blurRadius: _r(context, 14),
+                      offset: Offset(0, _r(context, 6)),
                     ),
                   ],
                 ),
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(36),
+                    borderRadius: BorderRadius.circular(_r(context, 30)),
                     onTap: () {},
-                    child: const Row(
+                    child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
                           'Proceed to Payment',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 22,
+                            fontSize: _r(context, 17),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        SizedBox(width: 10),
+                        SizedBox(width: _r(context, 8)),
                         Icon(
                           Icons.arrow_forward_rounded,
                           color: Colors.white,
-                          size: 30,
+                          size: _r(context, 22),
                         ),
                       ],
                     ),
@@ -374,43 +408,44 @@ class _MapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(34),
+      borderRadius: BorderRadius.circular(28 * compact),
       child: Container(
-        height: 350,
+        height: 260 * compact,
         color: const Color(0xFFE9DFC9),
         child: Stack(
           children: [
             Positioned.fill(child: CustomPaint(painter: _MapPatternPainter())),
             const Align(alignment: Alignment(0, -0.12), child: _MapPin()),
             Positioned(
-              left: 18,
-              right: 18,
-              bottom: 22,
+              left: 14 * compact,
+              right: 14 * compact,
+              bottom: 16 * compact,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
+                padding: EdgeInsets.symmetric(
+                  horizontal: 12 * compact,
+                  vertical: 10 * compact,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.96),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12 * compact),
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.gps_fixed,
                       color: Color(0xFF4A23CC),
-                      size: 20,
+                      size: 16 * compact,
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 8 * compact),
                     Expanded(
                       child: Text(
                         isConfirming
                             ? 'Confirming location...'
                             : 'Location selected',
-                        style: const TextStyle(
-                          fontSize: 18,
+                        style: TextStyle(
+                          fontSize: 14 * compact,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF252432),
                         ),
@@ -418,17 +453,17 @@ class _MapCard extends StatelessWidget {
                     ),
                     InkWell(
                       onTap: onChangeTap,
-                      borderRadius: BorderRadius.circular(8),
-                      child: const Padding(
+                      borderRadius: BorderRadius.circular(8 * compact),
+                      child: Padding(
                         padding: EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 4,
+                          horizontal: 6 * compact,
+                          vertical: 4 * compact,
                         ),
                         child: Text(
                           'CHANGE',
                           style: TextStyle(
                             color: Color(0xFF4A23CC),
-                            fontSize: 18,
+                            fontSize: 13 * compact,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.4,
                           ),
@@ -465,16 +500,22 @@ class _AddressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Material(
       color: selected ? Colors.white : const Color(0xFFECE7F4),
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(24 * compact),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(24 * compact),
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          padding: EdgeInsets.fromLTRB(
+            12 * compact,
+            12 * compact,
+            12 * compact,
+            12 * compact,
+          ),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(32),
+            borderRadius: BorderRadius.circular(24 * compact),
             border: selected
                 ? const Border(
                     left: BorderSide(color: Color(0xFF4A23CC), width: 8),
@@ -484,41 +525,41 @@ class _AddressCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 88,
-                height: 88,
+                width: 68 * compact,
+                height: 68 * compact,
                 decoration: BoxDecoration(
                   color: selected
                       ? const Color(0xFFE2DBF7)
                       : const Color(0xFFE6E2EF),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(4 * compact),
                 ),
                 child: Icon(
                   icon,
                   color: selected
                       ? const Color(0xFF4A23CC)
                       : const Color(0xFF585567),
-                  size: 40,
+                  size: 30 * compact,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 12 * compact),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        fontSize: 18,
+                      style: TextStyle(
+                        fontSize: 15 * compact,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF252432),
                         height: 1.0,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 5 * compact),
                     Text(
                       address,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: 13 * compact,
                         color: Color(0xFF4F4C5D),
                         height: 1.35,
                       ),
@@ -526,7 +567,7 @@ class _AddressCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 6 * compact),
               Icon(
                 selected
                     ? Icons.radio_button_checked_rounded
@@ -534,7 +575,7 @@ class _AddressCard extends StatelessWidget {
                 color: selected
                     ? const Color(0xFF4A23CC)
                     : const Color(0xFFB4AEC6),
-                size: 34,
+                size: 26 * compact,
               ),
             ],
           ),
@@ -549,39 +590,45 @@ class _SpeedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22 * compact),
         border: Border.all(color: const Color(0xFF2143D2), width: 3),
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: EdgeInsets.fromLTRB(
+              12 * compact,
+              12 * compact,
+              12 * compact,
+              10 * compact,
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Expanded(
                   child: Wrap(
-                    spacing: 10,
-                    runSpacing: 8,
+                    spacing: 8 * compact,
+                    runSpacing: 6 * compact,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      _PillLabel(label: 'EXPRESS DELIVERY'),
+                      const _PillLabel(label: 'EXPRESS DELIVERY'),
                       Text(
                         'Kinetic',
                         style: TextStyle(
                           color: Color(0xFF4A23CC),
                           fontWeight: FontWeight.w800,
-                          fontSize: 17,
+                          fontSize: 13 * compact,
                         ),
                       ),
                     ],
                   ),
                 ),
-                SizedBox(width: 10),
+                SizedBox(width: 8 * compact),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -589,17 +636,17 @@ class _SpeedCard extends StatelessWidget {
                       '15',
                       style: TextStyle(
                         color: Color(0xFF3C2DC2),
-                        fontSize: 38,
+                        fontSize: 30 * compact,
                         fontWeight: FontWeight.w800,
                         height: 0.95,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    SizedBox(height: 2 * compact),
                     Text(
                       'MINUTES',
                       style: TextStyle(
                         color: Color(0xFF4D4A5A),
-                        fontSize: 13,
+                        fontSize: 10 * compact,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1,
                       ),
@@ -609,26 +656,31 @@ class _SpeedCard extends StatelessWidget {
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 18),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              12 * compact,
+              0,
+              12 * compact,
+              14 * compact,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Arriving by 10:45 AM',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 18 * compact,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF1E1C28),
                     height: 1.1,
                   ),
                 ),
-                SizedBox(height: 10),
+                SizedBox(height: 8 * compact),
                 Text(
                   'Priority printing & lightning\ndispatch.',
                   style: TextStyle(
                     color: Color(0xFF4C495A),
-                    fontSize: 16,
+                    fontSize: 12 * compact,
                     height: 1.35,
                   ),
                 ),
@@ -648,16 +700,20 @@ class _PillLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: 10 * compact,
+        vertical: 6 * compact,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFFDCE2FF),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14 * compact),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 12,
+        style: TextStyle(
+          fontSize: 10 * compact,
           fontWeight: FontWeight.w800,
           color: Color(0xFF243278),
         ),
@@ -671,22 +727,27 @@ class _MapPin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
-      width: 96,
-      height: 96,
+      width: 78 * compact,
+      height: 78 * compact,
       decoration: BoxDecoration(
         color: const Color(0xFF4A23CC).withValues(alpha: 0.2),
         shape: BoxShape.circle,
       ),
       child: Center(
         child: Container(
-          width: 70,
-          height: 70,
+          width: 56 * compact,
+          height: 56 * compact,
           decoration: const BoxDecoration(
             color: Color(0xFF4A23CC),
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.location_on, color: Colors.white, size: 32),
+          child: Icon(
+            Icons.location_on,
+            color: Colors.white,
+            size: 24 * compact,
+          ),
         ),
       ),
     );

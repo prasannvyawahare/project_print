@@ -3,6 +3,15 @@ import 'package:flutter/material.dart';
 import '../../../delivery/presentation/pages/delivery_address_page.dart';
 import '../../domain/entities/print_order_data.dart';
 
+double _screenScale(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  final widthScale = (size.width / 390).clamp(0.82, 1.0);
+  final heightScale = (size.height / 844).clamp(0.82, 1.0);
+  return (widthScale * 0.7 + heightScale * 0.3).toDouble();
+}
+
+double _r(BuildContext context, double value) => value * _screenScale(context);
+
 class ConfigurePrintPage extends StatefulWidget {
   const ConfigurePrintPage({
     super.key,
@@ -87,21 +96,29 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
           children: [
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              padding: EdgeInsets.fromLTRB(
+                _r(context, 12),
+                _r(context, 8),
+                _r(context, 12),
+                _r(context, 10),
+              ),
               child: Row(
                 children: [
                   IconButton(
                     onPressed: () => Navigator.of(
                       context,
                     ).pop(widget.saveOnlyMode ? _order : null),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    icon: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: _r(context, 20),
+                    ),
                     color: accent,
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Configure Print',
                       style: TextStyle(
-                        fontSize: 22,
+                        fontSize: _r(context, 19),
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF1F1F2E),
                       ),
@@ -109,7 +126,10 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                   ),
                   IconButton(
                     onPressed: () {},
-                    icon: const Icon(Icons.notifications_none_rounded),
+                    icon: Icon(
+                      Icons.notifications_none_rounded,
+                      size: _r(context, 22),
+                    ),
                     color: const Color(0xFF1E2433),
                   ),
                 ],
@@ -117,11 +137,16 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+                padding: EdgeInsets.fromLTRB(
+                  _r(context, 18),
+                  _r(context, 16),
+                  _r(context, 18),
+                  _r(context, 16),
+                ),
                 child: Column(
                   children: [
                     _FileCard(document: _order.selectedDocument),
-                    const SizedBox(height: 16),
+                    SizedBox(height: _r(context, 12)),
                     _SectionCard(
                       title: 'NUMBER OF COPIES',
                       child: Row(
@@ -141,8 +166,8 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                             child: Center(
                               child: Text(
                                 _order.copies.toString().padLeft(2, '0'),
-                                style: const TextStyle(
-                                  fontSize: 38,
+                                style: TextStyle(
+                                  fontSize: _r(context, 30),
                                   fontWeight: FontWeight.w700,
                                   color: Color(0xFF272434),
                                 ),
@@ -161,7 +186,7 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _r(context, 10)),
                     _SectionCard(
                       title: 'COLOR MODE',
                       child: _ToggleRow(
@@ -176,7 +201,7 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _r(context, 10)),
                     _SectionCard(
                       title: 'PRINT OPTION',
                       child: Wrap(
@@ -237,14 +262,14 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _r(context, 10)),
                     _SectionCard(
                       title: 'PAGE RANGE',
                       trailing: Text(
                         'All Pages (1-${_order.totalPages})',
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: accent,
-                          fontSize: 14,
+                          fontSize: _r(context, 12),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -277,7 +302,7 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _r(context, 10)),
                     _SectionCard(
                       title: 'ORIENTATION',
                       child: _ToggleRow(
@@ -297,15 +322,17 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _r(context, 10)),
                     _SectionCard(
                       title: 'PAPER SIZE',
                       child: Container(
                         decoration: BoxDecoration(
                           color: const Color(0xFFF0EBF8),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(_r(context, 10)),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: _r(context, 10),
+                        ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: _order.paperSize,
@@ -330,7 +357,7 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: _r(context, 10)),
                     _TotalCard(
                       total: _order.estimatedTotalUsd,
                       onTap: _proceedToDelivery,
@@ -356,29 +383,30 @@ class _FileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(12 * compact),
       decoration: BoxDecoration(
         color: const Color(0xFFF0EBF8),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24 * compact),
       ),
       child: Row(
         children: [
           Container(
-            width: 78,
-            height: 118,
+            width: 64 * compact,
+            height: 96 * compact,
             decoration: BoxDecoration(
               color: const Color(0xFF2B5565),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(8 * compact),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.description_outlined,
               color: Colors.white70,
-              size: 40,
+              size: 32 * compact,
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 12 * compact),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -387,36 +415,36 @@ class _FileCard extends StatelessWidget {
                   document.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 20,
+                  style: TextStyle(
+                    fontSize: 16 * compact,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF262334),
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 3 * compact),
                 Text(
                   '${document.formattedSize} • ${document.pageCount} PAGES',
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: TextStyle(
+                    fontSize: 11.5 * compact,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF7A768A),
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 6 * compact),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 8 * compact,
+                    vertical: 4 * compact,
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE4DDF8),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12 * compact),
                   ),
-                  child: const Text(
+                  child: Text(
                     'READY TO PRINT',
                     style: TextStyle(
                       color: Color(0xFF4A23CC),
-                      fontSize: 12,
+                      fontSize: 10 * compact,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -439,12 +467,18 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      padding: EdgeInsets.fromLTRB(
+        14 * compact,
+        12 * compact,
+        14 * compact,
+        14 * compact,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24 * compact),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,9 +487,9 @@ class _SectionCard extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Color(0xFF4A465A),
-                  fontSize: 16,
+                  fontSize: 13 * compact,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 2,
                 ),
@@ -464,7 +498,7 @@ class _SectionCard extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 10 * compact),
           child,
         ],
       ),
@@ -485,6 +519,7 @@ class _RoundButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Material(
       color: filled ? const Color(0xFF4A23CC) : Colors.white,
       shape: const CircleBorder(),
@@ -492,10 +527,11 @@ class _RoundButton extends StatelessWidget {
         onTap: onTap,
         customBorder: const CircleBorder(),
         child: SizedBox(
-          width: 56,
-          height: 56,
+          width: 46 * compact,
+          height: 46 * compact,
           child: Icon(
             icon,
+            size: 20 * compact,
             color: filled ? Colors.white : const Color(0xFF5E37D4),
           ),
         ),
@@ -556,21 +592,22 @@ class _ToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Material(
       color: selected ? const Color(0xFF4A23CC) : const Color(0xFFE8E2F4),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(18 * compact),
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18 * compact),
         onTap: onTap,
         child: SizedBox(
-          height: 54,
+          height: 44 * compact,
           child: Center(
             child: Text(
               label,
               style: TextStyle(
                 color: selected ? Colors.white : const Color(0xFF5A5768),
                 fontWeight: FontWeight.w800,
-                fontSize: 16,
+                fontSize: 13 * compact,
               ),
             ),
           ),
@@ -593,18 +630,23 @@ class _OptionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Material(
       color: selected ? const Color(0xFF4A23CC) : const Color(0xFFE8E2F4),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(16 * compact),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16 * compact),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: 10 * compact,
+            vertical: 8 * compact,
+          ),
           child: Text(
             label,
             style: TextStyle(
               color: selected ? Colors.white : const Color(0xFF59566B),
+              fontSize: 12 * compact,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -627,12 +669,13 @@ class _RangeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF0EBF8),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10 * compact),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(horizontal: 10 * compact),
       child: Row(
         children: [
           Expanded(
@@ -642,13 +685,17 @@ class _RangeField extends StatelessWidget {
               onSubmitted: onSubmitted,
               onEditingComplete: () => FocusScope.of(context).unfocus(),
               decoration: const InputDecoration(border: InputBorder.none),
-              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 24 * compact,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w800,
+              fontSize: 11 * compact,
               color: Color(0xFF8B8799),
             ),
           ),
@@ -671,22 +718,29 @@ class _TotalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: EdgeInsets.fromLTRB(
+        14 * compact,
+        14 * compact,
+        14 * compact,
+        14 * compact,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(34),
+        borderRadius: BorderRadius.circular(28 * compact),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'ESTIMATED TOTAL',
                 style: TextStyle(
                   color: Color(0xFF666275),
+                  fontSize: 12 * compact,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 2,
                 ),
@@ -694,40 +748,50 @@ class _TotalCard extends StatelessWidget {
               const Spacer(),
               Text(
                 'EARN ${(total * 1).round()} POINTS',
-                style: const TextStyle(
+                style: TextStyle(
                   color: Color(0xFF1A56DD),
+                  fontSize: 11 * compact,
                   fontWeight: FontWeight.w800,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 4 * compact),
           Row(
             children: [
               Text(
                 '\$${total.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 46,
+                style: TextStyle(
+                  fontSize: 28 * compact,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF4A23CC),
                 ),
               ),
-              const SizedBox(width: 8),
-              const Text('USD', style: TextStyle(color: Color(0xFF6E6A7F))),
+              SizedBox(width: 6 * compact),
+              Text(
+                'USD',
+                style: TextStyle(
+                  color: Color(0xFF6E6A7F),
+                  fontSize: 12 * compact,
+                ),
+              ),
               const Spacer(),
-              const Text(
+              Text(
                 'Includes priority handling',
-                style: TextStyle(color: Color(0xFF7D788D)),
+                style: TextStyle(
+                  color: Color(0xFF7D788D),
+                  fontSize: 11 * compact,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 10 * compact),
           SizedBox(
             width: double.infinity,
-            height: 66,
+            height: 54 * compact,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(36),
+                borderRadius: BorderRadius.circular(30 * compact),
                 gradient: const LinearGradient(
                   colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
                 ),
@@ -735,7 +799,7 @@ class _TotalCard extends StatelessWidget {
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(36),
+                  borderRadius: BorderRadius.circular(30 * compact),
                   onTap: onTap,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -744,14 +808,15 @@ class _TotalCard extends StatelessWidget {
                         buttonLabel,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 20,
+                          fontSize: 16 * compact,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      const Icon(
+                      SizedBox(width: 8 * compact),
+                      Icon(
                         Icons.arrow_forward_rounded,
                         color: Colors.white,
+                        size: 20 * compact,
                       ),
                     ],
                   ),

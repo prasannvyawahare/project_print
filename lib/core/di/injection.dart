@@ -18,8 +18,10 @@ import '../../features/auth/domain/usecases/sign_out.dart';
 import '../../features/auth/domain/usecases/verify_and_save_user.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/home/data/datasources/home_remote_data_source.dart';
+import '../../features/home/data/datasources/home_local_data_source.dart';
 import '../../features/home/data/repositories/home_repository_impl.dart';
 import '../../features/home/domain/repositories/home_repository.dart';
+import '../../features/home/domain/usecases/get_print_categories.dart';
 import '../../features/home/domain/usecases/get_welcome_message.dart';
 import '../../features/home/presentation/bloc/home_bloc.dart';
 import '../network/dio_client.dart';
@@ -121,9 +123,14 @@ Future<void> initDependencies() async {
     ),
   );
 
+  sl.registerLazySingleton<HomeLocalDataSource>(
+    () => HomeLocalDataSourceImpl(preferences: sl<SharedPreferences>()),
+  );
+
   sl.registerLazySingleton<HomeRepository>(
     () => HomeRepositoryImpl(
       remoteDataSource: sl<HomeRemoteDataSource>(),
+      localDataSource: sl<HomeLocalDataSource>(),
       networkInfo: sl<NetworkInfo>(),
       logger: sl<Logger>(),
     ),
@@ -133,7 +140,11 @@ Future<void> initDependencies() async {
     () => GetWelcomeMessage(sl<HomeRepository>()),
   );
 
+  sl.registerLazySingleton<GetPrintCategories>(
+    () => GetPrintCategories(sl<HomeRepository>()),
+  );
+
   sl.registerFactory<HomeBloc>(
-    () => HomeBloc(getWelcomeMessage: sl<GetWelcomeMessage>()),
+    () => HomeBloc(getPrintCategories: sl<GetPrintCategories>()),
   );
 }

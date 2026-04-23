@@ -13,6 +13,15 @@ import '../../../print/presentation/bloc/print_flow_event.dart';
 import '../../../print/presentation/bloc/print_flow_state.dart';
 import '../../../print/presentation/pages/configure_print_page.dart';
 
+double _screenScale(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  final widthScale = (size.width / 390).clamp(0.82, 1.0);
+  final heightScale = (size.height / 844).clamp(0.82, 1.0);
+  return (widthScale * 0.7 + heightScale * 0.3).toDouble();
+}
+
+double _r(BuildContext context, double value) => value * _screenScale(context);
+
 class UploadDocumentsPage extends StatefulWidget {
   const UploadDocumentsPage({super.key});
 
@@ -332,19 +341,27 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
             children: [
               Container(
                 color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                padding: EdgeInsets.fromLTRB(
+                  _r(context, 12),
+                  _r(context, 8),
+                  _r(context, 12),
+                  _r(context, 10),
+                ),
                 child: Row(
                   children: [
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                      icon: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: _r(context, 20),
+                      ),
                       color: const Color(0xFF1E2433),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Text(
                         'Upload Documents',
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: _r(context, 19),
                           fontWeight: FontWeight.w700,
                           color: titleColor,
                         ),
@@ -352,12 +369,15 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                     ),
                     IconButton(
                       onPressed: () {},
-                      icon: const Icon(Icons.search_rounded),
+                      icon: Icon(Icons.search_rounded, size: _r(context, 22)),
                       color: const Color(0xFF1E2433),
                     ),
                     IconButton(
                       onPressed: () {},
-                      icon: const Icon(Icons.notifications_none_rounded),
+                      icon: Icon(
+                        Icons.notifications_none_rounded,
+                        size: _r(context, 22),
+                      ),
                       color: accent,
                     ),
                   ],
@@ -366,29 +386,34 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
               Expanded(
                 child: BlocBuilder<PrintFlowBloc, PrintFlowState>(
                   builder: (context, state) => SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                    padding: EdgeInsets.fromLTRB(
+                      _r(context, 18),
+                      _r(context, 18),
+                      _r(context, 18),
+                      _r(context, 14),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'STEP 01',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: _r(context, 13),
                             fontWeight: FontWeight.w800,
                             letterSpacing: 3,
                             color: accent,
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        SizedBox(height: _r(context, 10)),
                         RichText(
-                          text: const TextSpan(
+                          text: TextSpan(
                             style: TextStyle(
-                              fontSize: 54,
+                              fontSize: _r(context, 38),
                               height: 1.05,
                               fontWeight: FontWeight.w700,
                               color: titleColor,
                             ),
-                            children: [
+                            children: const [
                               TextSpan(text: 'Select your '),
                               TextSpan(
                                 text: 'Precision',
@@ -398,7 +423,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 28),
+                        SizedBox(height: _r(context, 18)),
                         Row(
                           children: [
                             Expanded(
@@ -410,7 +435,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                                 onTap: _pickFromFileManager,
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            SizedBox(width: _r(context, 12)),
                             Expanded(
                               child: _UploadSourceCard(
                                 icon: Icons.photo_camera_outlined,
@@ -422,15 +447,15 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        SizedBox(height: _r(context, 12)),
                         _RecentFilesCard(onTap: _pickFromGallery),
-                        const SizedBox(height: 28),
+                        SizedBox(height: _r(context, 18)),
                         Row(
                           children: [
-                            const Text(
+                            Text(
                               'Selected Files',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: _r(context, 20),
                                 fontWeight: FontWeight.w700,
                                 color: titleColor,
                               ),
@@ -439,7 +464,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                             Text(
                               '${state.files.length} ITEMS',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: _r(context, 14),
                                 fontWeight: FontWeight.w800,
                                 color: accent.withValues(alpha: 0.95),
                                 letterSpacing: 0.5,
@@ -447,24 +472,26 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
+                        SizedBox(height: _r(context, 10)),
                         if (state.lastOrder != null)
                           Container(
                             width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
+                            margin: EdgeInsets.only(bottom: _r(context, 10)),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: _r(context, 12),
+                              vertical: _r(context, 10),
                             ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFEDE6FA),
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(
+                                _r(context, 14),
+                              ),
                             ),
                             child: Text(
                               'Configured flow is active for ${state.configurations.length}/${state.files.length} files',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: Color(0xFF4A23CC),
-                                fontSize: 14,
+                                fontSize: _r(context, 12),
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -472,22 +499,24 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                         if (state.files.isEmpty)
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(22),
+                            padding: EdgeInsets.all(_r(context, 16)),
                             decoration: BoxDecoration(
                               color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(
+                                _r(context, 20),
+                              ),
                             ),
-                            child: const Text(
+                            child: Text(
                               'No files selected yet. Use File Manager, Camera or Gallery.',
                               style: TextStyle(
                                 color: Color(0xFF6A667A),
-                                fontSize: 16,
+                                fontSize: _r(context, 13),
                               ),
                             ),
                           ),
                         ...state.files.map(
                           (item) => Padding(
-                            padding: const EdgeInsets.only(bottom: 14),
+                            padding: EdgeInsets.only(bottom: _r(context, 10)),
                             child: Column(
                               children: [
                                 _SelectedFileCard(
@@ -508,7 +537,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: _r(context, 6)),
                         _AddFileCard(onTap: _showAddOptions),
                       ],
                     ),
@@ -520,45 +549,50 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
         ),
         bottomNavigationBar: Container(
           color: Colors.white.withValues(alpha: 0.65),
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 26),
+          padding: EdgeInsets.fromLTRB(
+            _r(context, 18),
+            _r(context, 12),
+            _r(context, 18),
+            _r(context, 18),
+          ),
           child: SizedBox(
-            height: 68,
+            height: _r(context, 54),
             child: DecoratedBox(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(36),
+                borderRadius: BorderRadius.circular(_r(context, 28)),
                 gradient: const LinearGradient(
                   colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: Color(0xFF1F31B6).withValues(alpha: 0.28),
-                    blurRadius: 20,
-                    offset: Offset(0, 10),
+                    blurRadius: _r(context, 16),
+                    offset: Offset(0, _r(context, 7)),
                   ),
                 ],
               ),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(36),
+                  borderRadius: BorderRadius.circular(_r(context, 28)),
                   onTap: _goToNextStep,
-                  child: const Center(
+                  child: Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
                           'Continue to Print',
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: _r(context, 17),
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(width: 8),
+                        SizedBox(width: _r(context, 6)),
                         Icon(
                           Icons.arrow_forward_rounded,
                           color: Colors.white,
-                          size: 30,
+                          size: _r(context, 22),
                         ),
                       ],
                     ),
@@ -666,21 +700,22 @@ class _UploadSourceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(22 * compact),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22 * compact),
         child: Container(
-          padding: const EdgeInsets.all(18),
+          padding: EdgeInsets.all(14 * compact),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(22 * compact),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF161426).withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+                blurRadius: 8 * compact,
+                offset: Offset(0, 3 * compact),
               ),
             ],
           ),
@@ -688,27 +723,30 @@ class _UploadSourceCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 72,
-                height: 72,
+                width: 56 * compact,
+                height: 56 * compact,
                 decoration: const BoxDecoration(
                   color: Color(0xFFE4DDF8),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(icon, size: 38, color: iconColor),
+                child: Icon(icon, size: 28 * compact, color: iconColor),
               ),
-              const SizedBox(height: 28),
+              SizedBox(height: 18 * compact),
               Text(
                 title,
-                style: const TextStyle(
-                  fontSize: 20,
+                style: TextStyle(
+                  fontSize: 16 * compact,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF222232),
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 3 * compact),
               Text(
                 subtitle,
-                style: const TextStyle(fontSize: 16, color: Color(0xFF585568)),
+                style: TextStyle(
+                  fontSize: 12 * compact,
+                  color: Color(0xFF585568),
+                ),
               ),
             ],
           ),
@@ -725,27 +763,31 @@ class _RecentFilesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Material(
       color: const Color(0xFFEFEAF8),
-      borderRadius: BorderRadius.circular(28),
+      borderRadius: BorderRadius.circular(22 * compact),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22 * compact),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          child: const Row(
+          padding: EdgeInsets.symmetric(
+            horizontal: 14 * compact,
+            vertical: 12 * compact,
+          ),
+          child: Row(
             children: [
               CircleAvatar(
-                radius: 24,
+                radius: 18 * compact,
                 backgroundColor: Color(0xFFCBD1DF),
                 child: Icon(
                   Icons.photo_library_outlined,
                   color: Color(0xFF49505C),
-                  size: 30,
+                  size: 22 * compact,
                 ),
               ),
-              SizedBox(width: 16),
+              SizedBox(width: 12 * compact),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -753,22 +795,25 @@ class _RecentFilesCard extends StatelessWidget {
                     Text(
                       'Gallery',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 16 * compact,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF232332),
                       ),
                     ),
-                    SizedBox(height: 3),
+                    SizedBox(height: 2 * compact),
                     Text(
                       'Choose images from your gallery',
-                      style: TextStyle(fontSize: 16, color: Color(0xFF5C596A)),
+                      style: TextStyle(
+                        fontSize: 12 * compact,
+                        color: Color(0xFF5C596A),
+                      ),
                     ),
                   ],
                 ),
               ),
               Icon(
                 Icons.chevron_right_rounded,
-                size: 34,
+                size: 24 * compact,
                 color: Color(0xFF767084),
               ),
             ],
@@ -804,12 +849,13 @@ class _SelectedFileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(12 * compact),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24 * compact),
       ),
       child: Row(
         children: [
@@ -817,17 +863,17 @@ class _SelectedFileCard extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               ClipRRect(
-                borderRadius: BorderRadius.circular(26),
+                borderRadius: BorderRadius.circular(20 * compact),
                 child: Container(
-                  width: 108,
-                  height: 108,
+                  width: 84 * compact,
+                  height: 84 * compact,
                   color: const Color(0xFF101C29),
                   child: _isImage
                       ? Image.file(File(item.path), fit: BoxFit.cover)
-                      : const Icon(
+                      : Icon(
                           Icons.description_outlined,
                           color: Colors.white,
-                          size: 42,
+                          size: 32 * compact,
                         ),
                 ),
               ),
@@ -835,8 +881,8 @@ class _SelectedFileCard extends StatelessWidget {
                 left: -7,
                 top: -7,
                 child: Container(
-                  width: 36,
-                  height: 36,
+                  width: 30 * compact,
+                  height: 30 * compact,
                   decoration: BoxDecoration(
                     color: configured
                         ? const Color(0xFF22A05B)
@@ -846,13 +892,13 @@ class _SelectedFileCard extends StatelessWidget {
                   child: Icon(
                     configured ? Icons.check_rounded : Icons.pending_outlined,
                     color: Colors.white,
-                    size: configured ? 22 : 20,
+                    size: configured ? 16 * compact : 15 * compact,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 12 * compact),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -861,33 +907,33 @@ class _SelectedFileCard extends StatelessWidget {
                   item.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 22,
+                  style: TextStyle(
+                    fontSize: 16 * compact,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF252432),
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 3 * compact),
                 Text(
                   '${item.formattedSize} • $pageCount pages',
-                  style: const TextStyle(
-                    fontSize: 16,
+                  style: TextStyle(
+                    fontSize: 12 * compact,
                     color: Color(0xFF575365),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 8 * compact),
           _ActionCircle(
             icon: Icons.remove_red_eye_outlined,
-            iconColor: Color(0xFF53505E),
+            iconColor: const Color(0xFF53505E),
             onTap: onView,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 8 * compact),
           _ActionCircle(
             icon: Icons.delete_outline_rounded,
-            iconColor: Color(0xFFC32222),
+            iconColor: const Color(0xFFC32222),
             onTap: onRemove,
           ),
         ],
@@ -909,6 +955,7 @@ class _ActionCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return Material(
       color: const Color(0xFFF1ECF8),
       shape: const CircleBorder(),
@@ -916,9 +963,9 @@ class _ActionCircle extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: SizedBox(
-          width: 62,
-          height: 62,
-          child: Icon(icon, size: 34, color: iconColor),
+          width: 46 * compact,
+          height: 46 * compact,
+          child: Icon(icon, size: 24 * compact, color: iconColor),
         ),
       ),
     );
@@ -932,27 +979,28 @@ class _AddFileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final compact = _screenScale(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 30),
+        padding: EdgeInsets.symmetric(vertical: 22 * compact),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
+          borderRadius: BorderRadius.circular(24 * compact),
           border: Border.all(color: const Color(0xFFD8D2E3), width: 2),
         ),
-        child: const Column(
+        child: Column(
           children: [
             Icon(
               Icons.add_circle_outline_rounded,
-              size: 52,
+              size: 40 * compact,
               color: Color(0xFF7B768A),
             ),
-            SizedBox(height: 10),
+            SizedBox(height: 8 * compact),
             Text(
               'Add another file',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 16 * compact,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF777184),
               ),

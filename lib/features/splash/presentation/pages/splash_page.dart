@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_dimensions.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/storage/temporary_auth_store.dart';
 import '../../domain/entities/splash_config.dart';
 
 class SplashPage extends StatefulWidget {
@@ -25,7 +27,11 @@ class _SplashPageState extends State<SplashPage> {
       Duration(milliseconds: _config.displayMilliseconds),
       () {
         if (!mounted) return;
-        Navigator.of(context).pushReplacementNamed(AppRouter.onboarding);
+        final hasActiveSession = sl<TemporaryAuthStore>().token.isNotEmpty;
+        final nextRoute = hasActiveSession
+            ? AppRouter.home
+            : AppRouter.onboarding;
+        Navigator.of(context).pushReplacementNamed(nextRoute);
       },
     );
   }
