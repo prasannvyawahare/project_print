@@ -33,7 +33,7 @@ class AuthRepositoryImpl implements AuthRepository {
       return Right(user);
     } on ServerException catch (error, stackTrace) {
       _logger.e('Auth server exception', error: error, stackTrace: stackTrace);
-      return Left(ServerFailure(error.message));
+      return Left(ServerFailure(error.message, statusCode: error.statusCode));
     } catch (error, stackTrace) {
       _logger.e('Auth unknown exception', error: error, stackTrace: stackTrace);
       return const Left(ServerFailure('Authentication failed'));
@@ -64,7 +64,7 @@ class AuthRepositoryImpl implements AuthRepository {
         error: error,
         stackTrace: stackTrace,
       );
-      return Left(ServerFailure(error.message));
+      return Left(ServerFailure(error.message, statusCode: error.statusCode));
     } catch (error, stackTrace) {
       _logger.e(
         'Verify user unknown exception',
@@ -91,7 +91,7 @@ class AuthRepositoryImpl implements AuthRepository {
         error: error,
         stackTrace: stackTrace,
       );
-      return Left(ServerFailure(error.message));
+      return Left(ServerFailure(error.message, statusCode: error.statusCode));
     } catch (error, stackTrace) {
       _logger.e(
         'Check storage unknown exception',
@@ -118,7 +118,7 @@ class AuthRepositoryImpl implements AuthRepository {
         error: error,
         stackTrace: stackTrace,
       );
-      return Left(ServerFailure(error.message));
+      return Left(ServerFailure(error.message, statusCode: error.statusCode));
     } catch (error, stackTrace) {
       _logger.e(
         'Create storage unknown exception',
@@ -145,7 +145,7 @@ class AuthRepositoryImpl implements AuthRepository {
         error: error,
         stackTrace: stackTrace,
       );
-      return Left(ServerFailure(error.message));
+      return Left(ServerFailure(error.message, statusCode: error.statusCode));
     } catch (error, stackTrace) {
       _logger.e(
         'Apple auth unknown exception',
@@ -167,7 +167,7 @@ class AuthRepositoryImpl implements AuthRepository {
         error: error,
         stackTrace: stackTrace,
       );
-      return Left(ServerFailure(error.message));
+      return Left(ServerFailure(error.message, statusCode: error.statusCode));
     } catch (error, stackTrace) {
       _logger.e(
         'Logout unknown exception',

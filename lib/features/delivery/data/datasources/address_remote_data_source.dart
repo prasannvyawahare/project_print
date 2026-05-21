@@ -85,9 +85,10 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
   @override
   Future<String> removeAddress({required String addressId}) async {
     try {
-      final response = await _dioClient.post(
+      final response = await _dioClient.delete(
         path: ApiConstants.addressRemove,
-        data: {'addressId': addressId},
+        data: {'addressId': addressId.trim()},
+        headers: {'content-type': 'application/json'},
       );
       final data = response.data as Map<String, dynamic>;
       final success = data['success'] as bool? ?? false;
@@ -110,9 +111,10 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
   @override
   Future<String> selectAddress({required String addressId}) async {
     try {
-      final response = await _dioClient.post(
+      final response = await _dioClient.patch(
         path: ApiConstants.addressSelect,
-        data: {'addressId': addressId},
+        data: {'addressId': addressId.trim()},
+        headers: {'content-type': 'application/json'},
       );
       final data = response.data as Map<String, dynamic>;
       final success = data['success'] as bool? ?? false;
