@@ -1,8 +1,17 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 
+import '../../../../core/di/injection.dart';
 import '../../../print/domain/entities/print_order_data.dart';
+import '../../domain/entities/address_entity.dart';
+import '../bloc/address_bloc.dart';
+import '../bloc/address_event.dart';
+import '../bloc/address_state.dart';
 
 double _screenScale(BuildContext context) {
   final size = MediaQuery.sizeOf(context);
@@ -24,47 +33,121 @@ class DeliveryAddressPage extends StatefulWidget {
 
 class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   late PrintOrderData _order;
+  String? _selectedAddressId;
+
+  // Location state
+  bool _isLocating = false;
+  String _locationLabel = '';
 
   @override
   void initState() {
     super.initState();
     _order = widget.initialOrder;
+    _fetchCurrentLocation();
   }
 
-  Future<void> _selectLocationFromMap() async {
-    final result = await showDialog<_MapSelectionResult>(
-      context: context,
-      builder: (_) =>
-          _MapSelectionDialog(initialAddress: _order.currentDeliveryAddress),
-    );
-
-    if (!mounted || result == null) {
-      return;
-    }
-
+  Future<void> _fetchCurrentLocation() async {
+    if (!mounted) return;
     setState(() {
-      _order = _order.copyWith(
-        selectedLocationAddress: result.address,
-        isLocationConfirmed: true,
-        homeAddress: _order.deliveryAddressType == DeliveryAddressType.home
-            ? result.address
-            : _order.homeAddress,
-        officeAddress: _order.deliveryAddressType == DeliveryAddressType.office
-            ? result.address
-            : _order.officeAddress,
-      );
+      _isLocating = true;
+      _locationLabel = '';
     });
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() {
+            _isLocating = false;
+            _locationLabel = 'Location permission denied';
+          });
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (!mounted) return;
+
+      String label;
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final parts = <String>[
+          if (p.subLocality != null && p.subLocality!.isNotEmpty)
+            p.subLocality!,
+          if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+          if (p.administrativeArea != null && p.administrativeArea!.isNotEmpty)
+            p.administrativeArea!,
+        ];
+        label = parts.isNotEmpty
+            ? parts.join(', ')
+            : '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+      } else {
+        label =
+            '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+      }
+
+      if (mounted) {
+        setState(() {
+          _locationLabel = label;
+          _isLocating = false;
+          _order = _order.copyWith(isLocationConfirmed: true);
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLocating = false;
+          _locationLabel = 'Unable to detect location';
+        });
+      }
+    }
   }
 
-  Future<void> _addOrUpdateAddress() async {
-    final initialType = _order.deliveryAddressType;
-    final controller = TextEditingController(
-      text: _order.currentDeliveryAddress,
-    );
-    var tempType = initialType;
-
-    final didSave = await showModalBottomSheet<bool>(
+  Future<void> _changeLocation() async {
+    final result = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (ctx) => _ChangeLocationSheet(initialLabel: _locationLabel),
+    );
+
+    if (!mounted || result == null) return;
+
+    if (result == '__gps__') {
+      await _fetchCurrentLocation();
+    } else if (result.isNotEmpty) {
+      setState(() {
+        _locationLabel = result;
+        _order = _order.copyWith(isLocationConfirmed: true);
+      });
+    }
+  }
+
+  Future<void> _showAddAddressSheet(BuildContext pageContext) async {
+    final addressController = TextEditingController();
+    final flatController = TextEditingController();
+    final landmarkController = TextEditingController();
+    final pincodeController = TextEditingController();
+    var selectedType = 'home';
+
+    await showModalBottomSheet<void>(
+      context: pageContext,
       isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: Colors.white,
@@ -83,7 +166,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Add or Update Address',
+                    'Add New Address',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -91,68 +174,139 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                     ),
                   ),
                   const SizedBox(height: 14),
+                  const Text(
+                    'Address Type',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4F4C5D),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 10,
                     children: [
-                      ChoiceChip(
-                        label: const Text('Home'),
-                        selected: tempType == DeliveryAddressType.home,
-                        onSelected: (_) {
-                          setSheetState(() {
-                            tempType = DeliveryAddressType.home;
-                            controller.text = _order.homeAddress;
-                          });
-                        },
-                      ),
-                      ChoiceChip(
-                        label: const Text('Office'),
-                        selected: tempType == DeliveryAddressType.office,
-                        onSelected: (_) {
-                          setSheetState(() {
-                            tempType = DeliveryAddressType.office;
-                            controller.text = _order.officeAddress;
-                          });
-                        },
-                      ),
+                      for (final type in ['home', 'office', 'other'])
+                        ChoiceChip(
+                          label: Text(
+                            type[0].toUpperCase() + type.substring(1),
+                          ),
+                          selected: selectedType == type,
+                          onSelected: (_) =>
+                              setSheetState(() => selectedType = type),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 14),
                   TextField(
-                    controller: controller,
+                    controller: addressController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Enter complete address',
+                      labelText: 'Address *',
+                      hintText: 'e.g. Malad East, Mumbai',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: flatController,
+                    decoration: InputDecoration(
+                      labelText: 'Flat / House No. *',
+                      hintText: 'e.g. 701 3A',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: landmarkController,
+                    decoration: InputDecoration(
+                      labelText: 'Landmark',
+                      hintText: 'e.g. Near Xavier School',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: pincodeController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: 'Pincode *',
+                      hintText: 'e.g. 400097',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A23CC),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                       onPressed: () {
-                        final value = controller.text.trim();
-                        if (value.isEmpty) {
+                        final address = addressController.text.trim();
+                        final flat = flatController.text.trim();
+                        final pincodeText = pincodeController.text.trim();
+
+                        if (address.isEmpty ||
+                            flat.isEmpty ||
+                            pincodeText.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Please fill address, flat and pincode',
+                              ),
+                            ),
+                          );
                           return;
                         }
-                        setState(() {
-                          _order = _order.copyWith(
-                            deliveryAddressType: tempType,
-                            homeAddress: tempType == DeliveryAddressType.home
-                                ? value
-                                : _order.homeAddress,
-                            officeAddress:
-                                tempType == DeliveryAddressType.office
-                                ? value
-                                : _order.officeAddress,
+
+                        final pincode = int.tryParse(pincodeText) ?? 0;
+                        if (pincode == 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter a valid pincode'),
+                            ),
                           );
-                        });
-                        Navigator.of(sheetContext).pop(true);
+                          return;
+                        }
+
+                        pageContext.read<AddressBloc>().add(
+                          AddressCreateRequested(
+                            addressType: selectedType,
+                            address: address,
+                            flat: flat,
+                            landmark: landmarkController.text.trim(),
+                            pincode: pincode,
+                          ),
+                        );
+                        Navigator.of(sheetContext).pop();
                       },
-                      child: const Text('Save Address'),
+                      child: const Text(
+                        'Save Address',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 4),
                 ],
               ),
             );
@@ -161,249 +315,443 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
       },
     );
 
-    controller.dispose();
-
-    if (didSave == true && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Address updated successfully')),
-      );
-    }
+    addressController.dispose();
+    flatController.dispose();
+    landmarkController.dispose();
+    pincodeController.dispose();
   }
 
-  void _selectAddressType(DeliveryAddressType type) {
-    setState(() {
-      _order = _order.copyWith(deliveryAddressType: type);
-    });
+  IconData _iconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'home':
+        return Icons.home_filled;
+      case 'office':
+      case 'work':
+        return Icons.work_outline_rounded;
+      default:
+        return Icons.location_on_outlined;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     const accent = Color(0xFF3E34D3);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F2FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.fromLTRB(
-                _r(context, 12),
-                _r(context, 8),
-                _r(context, 12),
-                _r(context, 10),
-              ),
-              child: Row(
+    return BlocProvider<AddressBloc>(
+      create: (_) => sl<AddressBloc>()..add(const AddressFetchRequested()),
+      child: Builder(
+        builder: (ctx) => BlocListener<AddressBloc, AddressState>(
+          listener: (context, state) {
+            if (state.status == AddressStatus.failure &&
+                state.error.isNotEmpty) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(state.error)));
+            }
+          },
+          child: Scaffold(
+            backgroundColor: const Color(0xFFF5F2FA),
+            body: SafeArea(
+              child: Column(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: _r(context, 20),
+                  Container(
+                    color: Colors.white,
+                    padding: EdgeInsets.fromLTRB(
+                      _r(context, 12),
+                      _r(context, 8),
+                      _r(context, 12),
+                      _r(context, 10),
                     ),
-                    color: const Color(0xFF1E2433),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: _r(context, 20),
+                          ),
+                          color: const Color(0xFF1E2433),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Delivery Address',
+                            style: TextStyle(
+                              fontSize: _r(context, 19),
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1F1F2E),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {},
+                          icon: Icon(
+                            Icons.notifications_none_rounded,
+                            size: _r(context, 22),
+                          ),
+                          color: const Color(0xFF1E2433),
+                        ),
+                      ],
+                    ),
                   ),
                   Expanded(
-                    child: Text(
-                      'Delivery Address',
-                      style: TextStyle(
-                        fontSize: _r(context, 19),
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1F1F2E),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        _r(context, 18),
+                        _r(context, 16),
+                        _r(context, 18),
+                        _r(context, 16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'STEP 02',
+                            style: TextStyle(
+                              fontSize: _r(context, 13),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 3,
+                              color: accent,
+                            ),
+                          ),
+                          SizedBox(height: _r(context, 12)),
+                          _MapCard(
+                            isLocating: _isLocating,
+                            locationLabel: _locationLabel,
+                            onChangeTap: _changeLocation,
+                          ),
+                          SizedBox(height: _r(context, 16)),
+                          Row(
+                            children: [
+                              Text(
+                                'Saved Locations',
+                                style: TextStyle(
+                                  fontSize: _r(context, 20),
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF21202D),
+                                ),
+                              ),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: () => _showAddAddressSheet(ctx),
+                                child: Text(
+                                  '+ ADD NEW',
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize: _r(context, 12),
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: _r(context, 8)),
+                          BlocBuilder<AddressBloc, AddressState>(
+                            builder: (context, state) {
+                              if (state.status == AddressStatus.loading ||
+                                  state.status == AddressStatus.creating) {
+                                return const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 24),
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                );
+                              }
+                              if (state.addresses.isEmpty) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 24,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Icon(
+                                          Icons.location_off_outlined,
+                                          size: _r(context, 48),
+                                          color: const Color(0xFFB4AEC6),
+                                        ),
+                                        SizedBox(height: _r(context, 10)),
+                                        Text(
+                                          'No saved addresses yet',
+                                          style: TextStyle(
+                                            fontSize: _r(context, 14),
+                                            color: const Color(0xFF7B778C),
+                                          ),
+                                        ),
+                                        SizedBox(height: _r(context, 6)),
+                                        TextButton.icon(
+                                          onPressed: () =>
+                                              _showAddAddressSheet(ctx),
+                                          icon: const Icon(Icons.add),
+                                          label: const Text('Add Address'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }
+                              return Column(
+                                children: [
+                                  for (
+                                    int i = 0;
+                                    i < state.addresses.length;
+                                    i++
+                                  ) ...[
+                                    if (i > 0)
+                                      SizedBox(height: _r(context, 10)),
+                                    _AddressCard(
+                                      entity: state.addresses[i],
+                                      icon: _iconForType(
+                                        state.addresses[i].addressType,
+                                      ),
+                                      selected:
+                                          state.addresses[i].selected ||
+                                          _selectedAddressId ==
+                                              state.addresses[i].id,
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedAddressId =
+                                              state.addresses[i].id;
+                                        });
+                                        ctx.read<AddressBloc>().add(
+                                          AddressSelectRequested(
+                                            addressId: state.addresses[i].id,
+                                          ),
+                                        );
+                                      },
+                                      onDelete: () {
+                                        ctx.read<AddressBloc>().add(
+                                          AddressRemoveRequested(
+                                            addressId: state.addresses[i].id,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
+                          ),
+                          SizedBox(height: _r(context, 18)),
+                          Text(
+                            'Delivery Speed',
+                            style: TextStyle(
+                              fontSize: _r(context, 20),
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF21202D),
+                            ),
+                          ),
+                          SizedBox(height: _r(context, 8)),
+                          const _SpeedCard(),
+                        ],
                       ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(
-                      Icons.notifications_none_rounded,
-                      size: _r(context, 22),
-                    ),
-                    color: const Color(0xFF1E2433),
                   ),
                 ],
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  _r(context, 18),
-                  _r(context, 16),
-                  _r(context, 18),
-                  _r(context, 16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'STEP 02',
-                      style: TextStyle(
-                        fontSize: _r(context, 13),
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 3,
-                        color: accent,
+            bottomNavigationBar: Container(
+              color: Colors.white.withValues(alpha: 0.65),
+              padding: EdgeInsets.fromLTRB(
+                _r(context, 18),
+                _r(context, 12),
+                _r(context, 18),
+                _r(context, 16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Total Delivery Cost',
+                        style: TextStyle(
+                          fontSize: _r(context, 16),
+                          color: const Color(0xFF3B3949),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '\$12.50',
+                        style: TextStyle(
+                          fontSize: _r(context, 22),
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF1E1B27),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: _r(context, 10)),
+                  SizedBox(
+                    width: double.infinity,
+                    height: _r(context, 54),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(_r(context, 30)),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF1F31B6,
+                            ).withValues(alpha: 0.24),
+                            blurRadius: _r(context, 14),
+                            offset: Offset(0, _r(context, 6)),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(_r(context, 30)),
+                          onTap: () {},
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Proceed to Payment',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: _r(context, 17),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              SizedBox(width: _r(context, 8)),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.white,
+                                size: _r(context, 22),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    SizedBox(height: _r(context, 12)),
-                    _MapCard(
-                      isConfirming: !_order.isLocationConfirmed,
-                      onChangeTap: _selectLocationFromMap,
-                    ),
-                    SizedBox(height: _r(context, 16)),
-                    Row(
-                      children: [
-                        Text(
-                          'Saved Locations',
-                          style: TextStyle(
-                            fontSize: _r(context, 20),
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF21202D),
-                          ),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: _addOrUpdateAddress,
-                          child: Text(
-                            '+ ADD NEW',
-                            style: TextStyle(
-                              color: accent,
-                              fontSize: _r(context, 12),
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: _r(context, 8)),
-                    _AddressCard(
-                      type: DeliveryAddressType.home,
-                      icon: Icons.home_filled,
-                      title: 'Home',
-                      address: _order.homeAddress,
-                      selected:
-                          _order.deliveryAddressType ==
-                          DeliveryAddressType.home,
-                      onTap: () => _selectAddressType(DeliveryAddressType.home),
-                    ),
-                    SizedBox(height: _r(context, 10)),
-                    _AddressCard(
-                      type: DeliveryAddressType.office,
-                      icon: Icons.work_outline_rounded,
-                      title: 'Office',
-                      address: _order.officeAddress,
-                      selected:
-                          _order.deliveryAddressType ==
-                          DeliveryAddressType.office,
-                      onTap: () =>
-                          _selectAddressType(DeliveryAddressType.office),
-                    ),
-                    SizedBox(height: _r(context, 18)),
-                    Text(
-                      'Delivery Speed',
-                      style: TextStyle(
-                        fontSize: _r(context, 20),
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF21202D),
-                      ),
-                    ),
-                    SizedBox(height: _r(context, 8)),
-                    _SpeedCard(),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: Container(
-        color: Colors.white.withValues(alpha: 0.65),
-        padding: EdgeInsets.fromLTRB(
-          _r(context, 18),
-          _r(context, 12),
-          _r(context, 18),
-          _r(context, 16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Text(
-                  'Total Delivery Cost',
-                  style: TextStyle(
-                    fontSize: _r(context, 16),
-                    color: Color(0xFF3B3949),
-                  ),
-                ),
-                Spacer(),
-                Text(
-                  '\$12.50',
-                  style: TextStyle(
-                    fontSize: _r(context, 22),
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF1E1B27),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: _r(context, 10)),
-            SizedBox(
-              width: double.infinity,
-              height: _r(context, 54),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(_r(context, 30)),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF1F31B6).withValues(alpha: 0.24),
-                      blurRadius: _r(context, 14),
-                      offset: Offset(0, _r(context, 6)),
-                    ),
-                  ],
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(_r(context, 30)),
-                    onTap: () {},
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Proceed to Payment',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: _r(context, 17),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        SizedBox(width: _r(context, 8)),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: _r(context, 22),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _MapCard extends StatelessWidget {
-  const _MapCard({required this.isConfirming, required this.onChangeTap});
+// Bottom sheet widget for changing location — owns its TextEditingController
+// so the controller is disposed correctly via State.dispose(), not after pop().
+class _ChangeLocationSheet extends StatefulWidget {
+  const _ChangeLocationSheet({required this.initialLabel});
 
-  final bool isConfirming;
+  final String initialLabel;
+
+  @override
+  State<_ChangeLocationSheet> createState() => _ChangeLocationSheetState();
+}
+
+class _ChangeLocationSheetState extends State<_ChangeLocationSheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialLabel);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        20 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Change Delivery Location',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1F1F2E),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              hintText: 'Enter location / landmark',
+              prefixIcon: const Icon(
+                Icons.location_on_outlined,
+                color: Color(0xFF4A23CC),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                  color: Color(0xFF4A23CC),
+                  width: 2,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).pop('__gps__'),
+            icon: const Icon(Icons.gps_fixed, color: Color(0xFF4A23CC)),
+            label: const Text(
+              'Use my current GPS location',
+              style: TextStyle(color: Color(0xFF4A23CC)),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF4A23CC)),
+              minimumSize: const Size.fromHeight(44),
+            ),
+          ),
+          const SizedBox(height: 10),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF4A23CC),
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Confirm Location',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapCard extends StatelessWidget {
+  const _MapCard({
+    required this.isLocating,
+    required this.locationLabel,
+    required this.onChangeTap,
+  });
+
+  final bool isLocating;
+  final String locationLabel;
   final VoidCallback onChangeTap;
 
   @override
@@ -433,26 +781,40 @@ class _MapCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.gps_fixed,
-                      color: Color(0xFF4A23CC),
-                      size: 16 * compact,
-                    ),
+                    if (isLocating)
+                      SizedBox(
+                        width: 16 * compact,
+                        height: 16 * compact,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: const Color(0xFF4A23CC),
+                        ),
+                      )
+                    else
+                      Icon(
+                        Icons.gps_fixed,
+                        color: Color(0xFF4A23CC),
+                        size: 16 * compact,
+                      ),
                     SizedBox(width: 8 * compact),
                     Expanded(
                       child: Text(
-                        isConfirming
-                            ? 'Confirming location...'
-                            : 'Location selected',
+                        isLocating
+                            ? 'Detecting your location...'
+                            : locationLabel.isEmpty
+                            ? 'Tap CHANGE to set location'
+                            : locationLabel,
                         style: TextStyle(
                           fontSize: 14 * compact,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF252432),
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     InkWell(
-                      onTap: onChangeTap,
+                      onTap: isLocating ? null : onChangeTap,
                       borderRadius: BorderRadius.circular(8 * compact),
                       child: Padding(
                         padding: EdgeInsets.symmetric(
@@ -462,7 +824,9 @@ class _MapCard extends StatelessWidget {
                         child: Text(
                           'CHANGE',
                           style: TextStyle(
-                            color: Color(0xFF4A23CC),
+                            color: isLocating
+                                ? Color(0xFFB0A8D0)
+                                : Color(0xFF4A23CC),
                             fontSize: 13 * compact,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 1.4,
@@ -483,20 +847,23 @@ class _MapCard extends StatelessWidget {
 
 class _AddressCard extends StatelessWidget {
   const _AddressCard({
-    required this.type,
+    required this.entity,
     required this.icon,
-    required this.title,
-    required this.address,
     required this.selected,
     required this.onTap,
+    required this.onDelete,
   });
 
-  final DeliveryAddressType type;
+  final AddressEntity entity;
   final IconData icon;
-  final String title;
-  final String address;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  String get _title {
+    final t = entity.addressType;
+    return t[0].toUpperCase() + t.substring(1);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -547,35 +914,78 @@ class _AddressCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
+                      _title,
                       style: TextStyle(
                         fontSize: 15 * compact,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF252432),
+                        color: const Color(0xFF252432),
                         height: 1.0,
                       ),
                     ),
-                    SizedBox(height: 5 * compact),
+                    SizedBox(height: 4 * compact),
                     Text(
-                      address,
+                      entity.flat.isNotEmpty
+                          ? '${entity.flat}, ${entity.address}'
+                          : entity.address,
                       style: TextStyle(
                         fontSize: 13 * compact,
-                        color: Color(0xFF4F4C5D),
+                        color: const Color(0xFF4F4C5D),
                         height: 1.35,
+                      ),
+                    ),
+                    if (entity.landmark.isNotEmpty) ...[
+                      SizedBox(height: 2 * compact),
+                      Text(
+                        'Near ${entity.landmark}',
+                        style: TextStyle(
+                          fontSize: 12 * compact,
+                          color: const Color(0xFF7B778C),
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
+                    SizedBox(height: 2 * compact),
+                    Text(
+                      'PIN: ${entity.pincode}',
+                      style: TextStyle(
+                        fontSize: 11 * compact,
+                        color: const Color(0xFF9B97A8),
                       ),
                     ),
                   ],
                 ),
               ),
               SizedBox(width: 6 * compact),
-              Icon(
-                selected
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_off_rounded,
-                color: selected
-                    ? const Color(0xFF4A23CC)
-                    : const Color(0xFFB4AEC6),
-                size: 26 * compact,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    color: selected
+                        ? const Color(0xFF4A23CC)
+                        : const Color(0xFFB4AEC6),
+                    size: 26 * compact,
+                  ),
+                  SizedBox(height: 6 * compact),
+                  GestureDetector(
+                    onTap: onDelete,
+                    child: Container(
+                      width: 28 * compact,
+                      height: 28 * compact,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEB),
+                        borderRadius: BorderRadius.circular(8 * compact),
+                      ),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        color: const Color(0xFFD93025),
+                        size: 17 * compact,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -750,120 +1160,6 @@ class _MapPin extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MapSelectionResult {
-  const _MapSelectionResult({required this.address});
-
-  final String address;
-}
-
-class _MapSelectionDialog extends StatefulWidget {
-  const _MapSelectionDialog({required this.initialAddress});
-
-  final String initialAddress;
-
-  @override
-  State<_MapSelectionDialog> createState() => _MapSelectionDialogState();
-}
-
-class _MapSelectionDialogState extends State<_MapSelectionDialog> {
-  Offset _pin = const Offset(0.5, 0.5);
-
-  String _buildAddress() {
-    final lat = 51.50 + (_pin.dy - 0.5) * 0.06;
-    final lng = -0.12 + (_pin.dx - 0.5) * 0.08;
-    final block = (100 + (_pin.dx * 200)).round();
-    return '$block Market Street, London (${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)})';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final address = _buildAddress();
-
-    return AlertDialog(
-      contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
-      content: SizedBox(
-        width: 380,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.map_outlined, color: Color(0xFF4A23CC)),
-                SizedBox(width: 8),
-                Text(
-                  'Select location on map',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1F1F2E),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            AspectRatio(
-              aspectRatio: 1.35,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return GestureDetector(
-                    onTapDown: (details) {
-                      setState(() {
-                        _pin = Offset(
-                          (details.localPosition.dx / constraints.maxWidth)
-                              .clamp(0.0, 1.0),
-                          (details.localPosition.dy / constraints.maxHeight)
-                              .clamp(0.0, 1.0),
-                        );
-                      });
-                    },
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                            child: CustomPaint(painter: _MapPatternPainter()),
-                          ),
-                          Positioned(
-                            left: _pin.dx * constraints.maxWidth - 16,
-                            top: _pin.dy * constraints.maxHeight - 32,
-                            child: const Icon(
-                              Icons.location_on,
-                              size: 32,
-                              color: Color(0xFF4A23CC),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                address,
-                style: const TextStyle(fontSize: 14, color: Color(0xFF4A465A)),
-              ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () =>
-              Navigator.of(context).pop(_MapSelectionResult(address: address)),
-          child: const Text('Use this location'),
-        ),
-      ],
     );
   }
 }
