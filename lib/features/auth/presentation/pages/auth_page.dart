@@ -109,7 +109,7 @@ class _AuthPageState extends State<AuthPage> {
                   token: tokenController.text.trim(),
                 ));
               },
-              child: const Text('Continue'),
+              child: const Text('Continue.'),
             ),
           ],
         );

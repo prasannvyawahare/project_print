@@ -14,7 +14,15 @@
       },
       "oauth_client": [
         {
-          "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
+          "client_id": "952760305739-lc2aom4a7jvsts947mr7mlfusokl13sh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.printhub.mobile",
+            "certificate_hash": "e5c2726f385c17f3d32f53b7d0dad1ac4a9ab925"
+          }
+        },
+        {
+          "client_id": "952760305739-rthjbvemo0779dag2vg458jviqlp37vo.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -43,6 +51,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "952760305739-oi6qpj1ol3spq529m1ove9vjg2rh13ag.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.printhub.mobile.debug",
+            "certificate_hash": "aa169be5a37d2a6f7b396c72feb6557705cab2b8"
+          }
+        },
+        {
           "client_id": "952760305739-tj4c4igu9bo6r878urbrq8cmlscc0ld3.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -51,7 +67,7 @@
           }
         },
         {
-          "client_id": "952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com",
+          "client_id": "952760305739-rthjbvemo0779dag2vg458jviqlp37vo.apps.googleusercontent.com",
           "client_type": 3
         }
       ],

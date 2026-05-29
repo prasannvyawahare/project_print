@@ -45,8 +45,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
 Future<AuthUserModel> signInWithGoogle() async {
   try {
-    await _googleSignIn.signOut();
-
     // Step 1 — Google Sign-In
     final GoogleSignInAccount account =
         await _googleSignIn.authenticate();

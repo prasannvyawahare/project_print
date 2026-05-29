@@ -1,9 +1,13 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:logger/logger.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../auth/domain/usecases/sign_out.dart';
+import '../../../upload/presentation/upload_drive_service.dart';
 import '../../domain/entities/print_category_entity.dart';
 import '../../../upload/presentation/pages/upload_documents_page.dart'
     show UploadDocumentsPage;
@@ -43,6 +47,15 @@ class _HomeViewState extends State<_HomeView> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const UploadDocumentsPage()),
     );
+  }
+
+  Future<void> _runTempUploadCheck() async {
+    final service = UploadDriveService(
+      firebaseAuth: FirebaseAuth.instance,
+      dioClient: sl<DioClient>(),
+      logger: Logger(),
+    );
+    await service.uploadFileToDrive(context);
   }
 
   Future<void> _logout() async {
@@ -87,6 +100,15 @@ class _HomeViewState extends State<_HomeView> {
 
     return Scaffold(
       backgroundColor: pageBackground,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _runTempUploadCheck,
+        backgroundColor: const Color(0xFFFF6B00),
+        icon: const Icon(Icons.bug_report, color: Colors.white),
+        label: const Text(
+          'TEST UPLOAD',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+      ),
       body: SafeArea(
         child: BlocBuilder<HomeBloc, HomeState>(
           builder: (context, state) {

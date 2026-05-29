@@ -46,7 +46,7 @@ Future<void> initDependencies() async {
 
   await sl<GoogleSignIn>().initialize(
     serverClientId:
-        '952760305739-e8f0cc9e6fb3fes6uo6l7bs3tpe0g2ba.apps.googleusercontent.com',
+        '952760305739-rthjbvemo0779dag2vg458jviqlp37vo.apps.googleusercontent.com',
   );
 
   sl.registerLazySingleton<TemporaryAuthStore>(
