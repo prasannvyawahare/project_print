@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/storage/temporary_auth_store.dart';
 import '../../../auth/domain/usecases/sign_out.dart';
 import '../../domain/entities/print_category_entity.dart';
 import '../../../upload/presentation/pages/upload_documents_page.dart'
@@ -38,6 +39,15 @@ class _HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<_HomeView> {
   bool _isLoggingOut = false;
+
+  String _greetingName() {
+    final displayName = sl<TemporaryAuthStore>().displayName.trim();
+    if (displayName.isEmpty) {
+      return 'Alex';
+    }
+
+    return displayName.split(RegExp(r'\s+')).first;
+  }
 
   void _openUploadDocuments() {
     Navigator.of(context).push(
@@ -163,7 +173,7 @@ class _HomeViewState extends State<_HomeView> {
                         ),
                         SizedBox(height: _r(context, 4)),
                         Text(
-                          'Hi, Alex👋',
+                          'Hi, ${_greetingName()}👋',
                           style: TextStyle(
                             fontSize: _r(context, 38),
                             fontWeight: FontWeight.w700,

@@ -117,6 +117,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       final String email = user.email ?? account.email;
+      final String displayName = user.displayName ?? account.displayName ?? '';
 
       final String? mobile = user.phoneNumber;
 
@@ -141,10 +142,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       await _temporaryAuthStore.save(
         mobile: mobile?.trim() ?? '',
         token: firebaseIdToken,
+        displayName: displayName,
       );
 
       return AuthUserModel(
         email: email,
+        displayName: displayName,
         mobile: mobile,
         authToken: firebaseIdToken,
       );

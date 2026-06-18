@@ -16,11 +16,24 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
+  bool _isMobileDialogOpen = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
+          if (state.nextStep == AuthNextStep.enterMobile) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) {
+                return;
+              }
+
+              _showMobileNumberDialog(context, state);
+            });
+            return;
+          }
+
           if (state.status == AuthStatus.success) {
             Navigator.of(context).pushReplacementNamed(AppRouter.main);
           }
@@ -415,6 +428,42 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
+  Future<void> _showMobileNumberDialog(
+    BuildContext context,
+    AuthState state,
+  ) async {
+    if (_isMobileDialogOpen || !mounted) {
+      return;
+    }
+
+    _isMobileDialogOpen = true;
+
+    try {
+      final mobile = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => const _MobileNumberDialog(),
+      );
+
+      if (!mounted || mobile == null || mobile.isEmpty) {
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      context.read<AuthBloc>().add(
+        AuthManualMobileSubmitted(
+          mobile: mobile,
+          token: state.pendingAuthToken,
+        ),
+      );
+    } finally {
+      _isMobileDialogOpen = false;
+    }
+  }
+
   Widget _buildBackgroundShapes(double scale) {
     return IgnorePointer(
       child: Stack(
@@ -531,6 +580,64 @@ class _FadedShape extends StatelessWidget {
         color: AppColors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppDimensions.radius52),
       ),
+    );
+  }
+}
+
+class _MobileNumberDialog extends StatefulWidget {
+  const _MobileNumberDialog();
+
+  @override
+  State<_MobileNumberDialog> createState() => _MobileNumberDialogState();
+}
+
+class _MobileNumberDialogState extends State<_MobileNumberDialog> {
+  final TextEditingController _mobileController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _mobileController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.of(context).pop(_mobileController.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add mobile number'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _mobileController,
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(
+            labelText: 'Mobile number',
+            hintText: 'Enter your mobile number',
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Mobile number is required';
+            }
+            return null;
+          },
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Continue')),
+      ],
     );
   }
 }

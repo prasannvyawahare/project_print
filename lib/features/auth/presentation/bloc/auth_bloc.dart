@@ -165,6 +165,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           return;
         }
 
+        if (mobile.isEmpty) {
+          emit(
+            state.copyWith(
+              status: AuthStatus.initial,
+              errorMessage: '',
+              pendingEmail: email,
+              pendingAuthToken: authToken,
+              nextStep: AuthNextStep.enterMobile,
+            ),
+          );
+          return;
+        }
+
         final verifyResult = await _verifyAndSaveUser(
           VerifyAndSaveUserParams(
             email: email,
