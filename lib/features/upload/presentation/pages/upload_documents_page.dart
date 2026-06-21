@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/widgets/primary_action_button.dart';
 import '../../../delivery/presentation/pages/delivery_address_page.dart';
 import '../../../print/domain/entities/print_order_data.dart';
 import '../../../print/presentation/bloc/print_flow_bloc.dart';
@@ -631,62 +632,13 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
             _r(context, 18),
             _r(context, 18),
           ),
-          child: SizedBox(
+          child: PrimaryActionButton(
+            label: 'Continue to Print',
+            onPressed: _goToNextStep,
+            isLoading: _isCreatingOrder,
             height: _r(context, 54),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(_r(context, 28)),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0xFF1F31B6).withValues(alpha: 0.28),
-                    blurRadius: _r(context, 16),
-                    offset: Offset(0, _r(context, 7)),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(_r(context, 28)),
-                  onTap: _isCreatingOrder ? null : _goToNextStep,
-                  child: Center(
-                    child: _isCreatingOrder
-                        ? SizedBox(
-                            width: _r(context, 22),
-                            height: _r(context, 22),
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Continue to Print',
-                                style: TextStyle(
-                                  fontSize: _r(context, 17),
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(width: _r(context, 6)),
-                              Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Colors.white,
-                                size: _r(context, 22),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
-              ),
-            ),
+            fontSize: _r(context, 17),
+            iconSize: _r(context, 22),
           ),
         ),
       ),

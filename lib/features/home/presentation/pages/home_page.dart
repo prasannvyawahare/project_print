@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
+import '../../../../core/widgets/primary_action_button.dart';
 import '../../../auth/domain/usecases/sign_out.dart';
 import '../../domain/entities/print_category_entity.dart';
 import '../../../upload/presentation/pages/upload_documents_page.dart'
@@ -89,7 +90,7 @@ class _HomeViewState extends State<_HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    const pageBackground = Color(0xFFF5F2FA);
+    const pageBackground = Color(0xFFFFF7F6);
     const accent = Color(0xFF6233DD);
     const mutedText = Color(0xFF9A95A8);
     const primaryText = Color(0xFF242230);
@@ -165,7 +166,7 @@ class _HomeViewState extends State<_HomeView> {
                         Text(
                           'OVERVIEW',
                           style: TextStyle(
-                            fontSize: _r(context, 26),
+                            fontSize: _r(context, 18),
                             fontWeight: FontWeight.w300,
                             letterSpacing: 1.1,
                             color: Color(0xFF494652),
@@ -175,7 +176,7 @@ class _HomeViewState extends State<_HomeView> {
                         Text(
                           'Hi, ${_greetingName()}👋',
                           style: TextStyle(
-                            fontSize: _r(context, 38),
+                            fontSize: _r(context, 24),
                             fontWeight: FontWeight.w700,
                             color: primaryText,
                             height: 1.05,
@@ -188,42 +189,10 @@ class _HomeViewState extends State<_HomeView> {
                             color: state.status == HomeStatus.failure
                                 ? Colors.red.shade600
                                 : mutedText,
-                            fontSize: _r(context, 13.5),
+                            fontSize: _r(context, 12),
                           ),
                         ),
                         SizedBox(height: _r(context, 16)),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: _r(context, 12),
-                            vertical: _r(context, 10),
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFEBF7),
-                            borderRadius: BorderRadius.circular(
-                              _r(context, 12),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.search_rounded,
-                                color: Color(0xFF8F8AA0),
-                                size: _r(context, 22),
-                              ),
-                              SizedBox(width: _r(context, 8)),
-                              Expanded(
-                                child: Text(
-                                  'Upload or search document',
-                                  style: TextStyle(
-                                    color: Color(0xFFABA6B7),
-                                    fontSize: _r(context, 14),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: _r(context, 20)),
                         const _PriorityCard(),
                         SizedBox(height: _r(context, 20)),
                         Text(
@@ -364,7 +333,7 @@ class _PriorityCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF4A20C7), Color(0xFF1946F3)],
+          colors: [Color(0xFF4A20C7), Color(0xFF40D9D9)],
         ),
         boxShadow: [
           BoxShadow(
@@ -389,7 +358,7 @@ class _PriorityCard extends StatelessWidget {
                 'PRIORITY SERVICE',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 13.5 * compact,
+                  fontSize: 14 * compact,
                   letterSpacing: 2,
                   fontWeight: FontWeight.w700,
                 ),
@@ -398,51 +367,43 @@ class _PriorityCard extends StatelessWidget {
           ),
           SizedBox(height: 12 * compact),
           Text(
-            '15-minute\nexpress\ndelivery',
+            '15-minute express\nDelivery',
             style: TextStyle(
               color: Colors.white,
-              height: 1.15,
-              fontSize: 38 * compact,
-              fontWeight: FontWeight.w700,
+              height: 1.08,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
             ),
           ),
           SizedBox(height: 8 * compact),
           Text(
             'Fastest print-to-door in the city.',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.8),
-              fontSize: 16 * compact,
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 14,
             ),
           ),
           SizedBox(height: 12 * compact),
-          Row(
-            children: [
-              SizedBox(
-                height: 44 * compact,
-                child: FilledButton(
-                  onPressed: () {},
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF3E2EC8),
-                    textStyle: TextStyle(
-                      fontSize: 14 * compact,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8 * compact),
-                    child: Text('Track Live'),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.bolt_rounded,
-                color: Colors.white.withValues(alpha: 0.2),
-                size: 62 * compact,
-              ),
-            ],
-          ),
+
+          // Row(
+          //   children: [
+          //     PrimaryActionButton(
+          //       label: 'Track Live',
+          //       onPressed: () {},
+          //       expand: false,
+          //       trailingIcon: null,
+          //       height: 44 * compact,
+          //       fontSize: 14 * compact,
+          //       borderRadius: 20,
+          //     ),
+          //     const Spacer(),
+          //     Icon(
+          //       Icons.bolt_rounded,
+          //       color: Colors.white.withValues(alpha: 0.2),
+          //       size: 62 * compact,
+          //     ),
+          //   ],
+          // ),
         ],
       ),
     );
@@ -549,14 +510,12 @@ class _ServiceTile extends StatelessWidget {
                     child: _AvatarIcon(
                       avatarUrl: category.avatar,
                       fallbackIcon: icon,
-                      iconColor: background.computeLuminance() < 0.4
-                          ? const Color(0xFFE6DAFF)
-                          : const Color(0xFF6334DC),
+                      iconColor: const Color(0xFFE6DAFF),
                       compact: compact,
                     ),
                   ),
                 ),
-                const Spacer(),
+                //  const Spacer(),
                 Text(
                   category.printType,
                   style: TextStyle(

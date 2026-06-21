@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/widgets/primary_action_button.dart';
 import '../../../print/domain/entities/print_order_data.dart';
 import '../../domain/entities/address_entity.dart';
 import '../bloc/address_bloc.dart';
@@ -602,52 +603,12 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                     ],
                   ),
                   SizedBox(height: _r(context, 10)),
-                  SizedBox(
-                    width: double.infinity,
+                  PrimaryActionButton(
+                    label: 'Proceed to CheckOut',
+                    onPressed: () {},
                     height: _r(context, 54),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(_r(context, 30)),
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(
-                              0xFF1F31B6,
-                            ).withValues(alpha: 0.24),
-                            blurRadius: _r(context, 14),
-                            offset: Offset(0, _r(context, 6)),
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(_r(context, 30)),
-                          onTap: () {},
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Proceed to CheckOut',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: _r(context, 17),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              SizedBox(width: _r(context, 8)),
-                              Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Colors.white,
-                                size: _r(context, 22),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    fontSize: _r(context, 17),
+                    iconSize: _r(context, 22),
                   ),
                 ],
               ),

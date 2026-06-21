@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_dimensions.dart';
+import '../../../../core/widgets/primary_action_button.dart';
 import '../../domain/entities/onboarding_step.dart';
 import '../widgets/onboarding_hero_card.dart';
 
@@ -150,47 +151,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     scale: scale,
                   ),
                   SizedBox(height: AppDimensions.spacing12 * scale),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(
-                        AppDimensions.radius40,
-                      ),
-                      gradient: AppGradients.onboardingPrimaryButton,
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x3F4753E0),
-                          blurRadius: 16,
-                          offset: Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _goNext,
-                        style: ElevatedButton.styleFrom(
-                          elevation: 0,
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          foregroundColor: Colors.white,
-                          minimumSize: Size.fromHeight(buttonHeight),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppDimensions.radius40,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          _currentIndex == _steps.length - 1
-                              ? AppConstants.getStarted
-                              : AppConstants.next,
-                          style: TextStyle(
-                            fontSize: buttonTextSize,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
+                  PrimaryActionButton(
+                    label: _currentIndex == _steps.length - 1
+                        ? AppConstants.getStarted
+                        : AppConstants.next,
+                    onPressed: _goNext,
+                    height: buttonHeight,
+                    fontSize: buttonTextSize,
                   ),
                   SizedBox(height: AppDimensions.spacing6 * scale),
                   TextButton(
