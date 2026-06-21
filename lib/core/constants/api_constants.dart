@@ -16,6 +16,8 @@ class ApiConstants {
   static const String addressRemove = 'address/remove';
   static const String addressSelect = 'address/select';
 
+  static const String orderCreate = 'order/create';
+
   // Keep existing demo endpoint working with an absolute URL.
   static const String welcomePath =
       'https://jsonplaceholder.typicode.com/posts/1';

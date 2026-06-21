@@ -23,9 +23,14 @@ double _screenScale(BuildContext context) {
 double _r(BuildContext context, double value) => value * _screenScale(context);
 
 class DeliveryAddressPage extends StatefulWidget {
-  const DeliveryAddressPage({super.key, required this.initialOrder});
+  const DeliveryAddressPage({
+    super.key,
+    required this.initialOrder,
+    this.orderId,
+  });
 
   final PrintOrderData initialOrder;
+  final String? orderId;
 
   @override
   State<DeliveryAddressPage> createState() => _DeliveryAddressPageState();
@@ -33,6 +38,7 @@ class DeliveryAddressPage extends StatefulWidget {
 
 class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   late PrintOrderData _order;
+  late final String? _orderId;
   String? _selectedAddressId;
 
   // Location state
@@ -43,6 +49,9 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
   void initState() {
     super.initState();
     _order = widget.initialOrder;
+    _orderId = widget.orderId?.trim().isEmpty == true
+        ? null
+        : widget.orderId?.trim();
     _fetchCurrentLocation();
   }
 
@@ -413,6 +422,17 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                               color: accent,
                             ),
                           ),
+                          if (_orderId != null) ...[
+                            SizedBox(height: _r(context, 6)),
+                            Text(
+                              'Order ID: $_orderId',
+                              style: TextStyle(
+                                fontSize: _r(context, 12),
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF6A667A),
+                              ),
+                            ),
+                          ],
                           SizedBox(height: _r(context, 12)),
                           _MapCard(
                             isLocating: _isLocating,
@@ -610,7 +630,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Proceed to Payment',
+                                'Proceed to CheckOut',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: _r(context, 17),

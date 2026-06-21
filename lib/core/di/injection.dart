@@ -25,6 +25,7 @@ import '../../features/delivery/domain/usecases/get_addresses.dart';
 import '../../features/delivery/domain/usecases/remove_address.dart';
 import '../../features/delivery/domain/usecases/select_address.dart';
 import '../../features/delivery/presentation/bloc/address_bloc.dart';
+import '../../features/upload/data/datasources/order_remote_data_source.dart';
 import '../../features/home/data/datasources/home_remote_data_source.dart';
 import '../../features/home/data/datasources/home_local_data_source.dart';
 import '../../features/home/data/repositories/home_repository_impl.dart';
@@ -194,6 +195,15 @@ Future<void> initDependencies() async {
       getAddresses: sl<GetAddresses>(),
       removeAddress: sl<RemoveAddress>(),
       selectAddress: sl<SelectAddress>(),
+    ),
+  );
+
+  sl.registerLazySingleton<OrderRemoteDataSource>(
+    () => OrderRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      temporaryAuthStore: sl<TemporaryAuthStore>(),
+      firebaseAuth: sl<FirebaseAuth>(),
+      logger: sl<Logger>(),
     ),
   );
 }
