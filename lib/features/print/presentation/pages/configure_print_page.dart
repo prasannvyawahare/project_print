@@ -17,10 +17,18 @@ class ConfigurePrintPage extends StatefulWidget {
     super.key,
     required this.initialOrder,
     this.saveOnlyMode = false,
+    this.categoryName,
+    this.categoryRate,
   });
 
   final PrintOrderData initialOrder;
   final bool saveOnlyMode;
+
+  /// Print category selected on the home screen (e.g. "Color A4").
+  final String? categoryName;
+
+  /// Per-page rate for the selected category, as returned by the backend.
+  final num? categoryRate;
 
   @override
   State<ConfigurePrintPage> createState() => _ConfigurePrintPageState();
@@ -69,6 +77,23 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
 
     _fromController.text = _order.pageFrom.toString();
     _toController.text = _order.pageTo.toString();
+  }
+
+  bool get _hasCategoryRate =>
+      widget.categoryRate != null && widget.categoryRate! > 0;
+
+  int get _selectedPages {
+    final pages = _order.pageTo - _order.pageFrom + 1;
+    return pages < 1 ? 1 : pages;
+  }
+
+  /// Live total based on the selected category rate (pages × copies × rate).
+  /// Falls back to the order's estimate when no category rate was passed.
+  double get _liveTotal {
+    if (!_hasCategoryRate) {
+      return _order.estimatedTotalUsd;
+    }
+    return _selectedPages * _order.copies * widget.categoryRate!.toDouble();
   }
 
   void _proceedToDelivery() {
@@ -145,6 +170,14 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                 ),
                 child: Column(
                   children: [
+                    if (widget.categoryName != null &&
+                        widget.categoryName!.isNotEmpty) ...[
+                      _CategoryCard(
+                        name: widget.categoryName!,
+                        rate: widget.categoryRate,
+                      ),
+                      SizedBox(height: _r(context, 12)),
+                    ],
                     _FileCard(document: _order.selectedDocument),
                     SizedBox(height: _r(context, 12)),
                     _SectionCard(
@@ -359,7 +392,9 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                     ),
                     SizedBox(height: _r(context, 10)),
                     _TotalCard(
-                      total: _order.estimatedTotalUsd,
+                      total: _liveTotal,
+                      currencySymbol: _hasCategoryRate ? 'Rs. ' : '\$',
+                      currencyCode: _hasCategoryRate ? 'INR' : 'USD',
                       onTap: _proceedToDelivery,
                       buttonLabel: widget.saveOnlyMode
                           ? 'Save Configuration'
@@ -710,11 +745,15 @@ class _TotalCard extends StatelessWidget {
     required this.total,
     required this.onTap,
     required this.buttonLabel,
+    this.currencySymbol = '\$',
+    this.currencyCode = 'USD',
   });
 
   final double total;
   final VoidCallback onTap;
   final String buttonLabel;
+  final String currencySymbol;
+  final String currencyCode;
 
   @override
   Widget build(BuildContext context) {
@@ -760,7 +799,7 @@ class _TotalCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                '\$${total.toStringAsFixed(2)}',
+                '$currencySymbol${total.toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 28 * compact,
                   fontWeight: FontWeight.w800,
@@ -769,7 +808,7 @@ class _TotalCard extends StatelessWidget {
               ),
               SizedBox(width: 6 * compact),
               Text(
-                'USD',
+                currencyCode,
                 style: TextStyle(
                   color: Color(0xFF6E6A7F),
                   fontSize: 12 * compact,
@@ -824,6 +863,99 @@ class _TotalCard extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.name, required this.rate});
+
+  final String name;
+  final num? rate;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14 * compact),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24 * compact),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48 * compact,
+            height: 48 * compact,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.local_print_shop_outlined,
+              color: Colors.white,
+              size: 26 * compact,
+            ),
+          ),
+          SizedBox(width: 12 * compact),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SELECTED SERVICE',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10.5 * compact,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
+                ),
+                SizedBox(height: 3 * compact),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18 * compact,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (rate != null && rate! > 0) ...[
+            SizedBox(width: 8 * compact),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Rs. $rate',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18 * compact,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 2 * compact),
+                Text(
+                  'PER PAGE',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 9.5 * compact,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

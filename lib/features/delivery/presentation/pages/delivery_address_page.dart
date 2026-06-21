@@ -9,6 +9,7 @@ import 'package:geocoding/geocoding.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/widgets/primary_action_button.dart';
 import '../../../print/domain/entities/print_order_data.dart';
+import '../../../upload/presentation/pages/order_summary_page.dart';
 import '../../domain/entities/address_entity.dart';
 import '../bloc/address_bloc.dart';
 import '../bloc/address_event.dart';
@@ -147,6 +148,27 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
         _order = _order.copyWith(isLocationConfirmed: true);
       });
     }
+  }
+
+  void _proceedToCheckout() {
+    final orderId = _orderId;
+    if (orderId == null || orderId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order ID is missing. Please start the order again.'),
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderSummaryPage(
+          orderId: orderId,
+          deliveryAddress: _locationLabel.isEmpty ? null : _locationLabel,
+        ),
+      ),
+    );
   }
 
   Future<void> _showAddAddressSheet(BuildContext pageContext) async {
@@ -605,7 +627,7 @@ class _DeliveryAddressPageState extends State<DeliveryAddressPage> {
                   SizedBox(height: _r(context, 10)),
                   PrimaryActionButton(
                     label: 'Proceed to CheckOut',
-                    onPressed: () {},
+                    onPressed: _proceedToCheckout,
                     height: _r(context, 54),
                     fontSize: _r(context, 17),
                     iconSize: _r(context, 22),

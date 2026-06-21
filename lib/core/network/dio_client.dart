@@ -59,9 +59,14 @@ class DioClient {
 
   Future<Response<dynamic>> get({
     required String path,
+    Object? data,
     Map<String, dynamic>? queryParameters,
   }) {
-    return _dio.get<dynamic>(path, queryParameters: queryParameters);
+    return _dio.get<dynamic>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+    );
   }
 
   Future<Response<dynamic>> post({

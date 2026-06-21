@@ -26,7 +26,13 @@ double _screenScale(BuildContext context) {
 double _r(BuildContext context, double value) => value * _screenScale(context);
 
 class UploadDocumentsPage extends StatefulWidget {
-  const UploadDocumentsPage({super.key});
+  const UploadDocumentsPage({super.key, this.categoryName, this.categoryRate});
+
+  /// Print category selected on the home screen (e.g. "Color A4").
+  final String? categoryName;
+
+  /// Per-page rate for the selected category, as returned by the backend.
+  final num? categoryRate;
 
   @override
   State<UploadDocumentsPage> createState() => _UploadDocumentsPageState();
@@ -59,8 +65,12 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
     final initialOrder = state.buildOrderForFile(item);
     final updatedOrder = await Navigator.of(context).push<PrintOrderData>(
       MaterialPageRoute<PrintOrderData>(
-        builder: (_) =>
-            ConfigurePrintPage(initialOrder: initialOrder, saveOnlyMode: true),
+        builder: (_) => ConfigurePrintPage(
+          initialOrder: initialOrder,
+          saveOnlyMode: true,
+          categoryName: widget.categoryName,
+          categoryRate: widget.categoryRate,
+        ),
       ),
     );
 
@@ -372,7 +382,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
         fileType: _fileTypeFor(file.name),
         numberOfCopy: config.copies,
         samePage: config.pageFrom == config.pageTo,
-        printType: _printTypeFor(config),
+        printType: widget.categoryName ?? _printTypeFor(config),
       );
     }).toList();
   }

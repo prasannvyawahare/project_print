@@ -17,6 +17,7 @@ class ApiConstants {
   static const String addressSelect = 'address/select';
 
   static const String orderCreate = 'order/create';
+  static const String orderSummary = 'order/order-summary';
 
   // Keep existing demo endpoint working with an absolute URL.
   static const String welcomePath =

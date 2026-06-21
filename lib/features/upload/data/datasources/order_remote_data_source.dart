@@ -5,9 +5,12 @@ import 'package:logger/logger.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
+import '../models/order_summary_model.dart';
 
 abstract class OrderRemoteDataSource {
   Future<String> createOrder({required List<OrderCreateItem> items});
+
+  Future<OrderSummaryResponse> getOrderSummary({required String orderId});
 }
 
 class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
@@ -95,6 +98,54 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         rethrow;
       }
       throw const OrderCreateException('Failed to create order.');
+    }
+  }
+
+  @override
+  Future<OrderSummaryResponse> getOrderSummary({
+    required String orderId,
+  }) async {
+    if (orderId.isEmpty) {
+      throw const OrderCreateException('Missing order ID for the summary.');
+    }
+
+    try {
+      final response = await _dioClient.get(
+        path: ApiConstants.orderSummary,
+        data: {'orderId': orderId},
+      );
+
+      final responseData = response.data;
+      final responseMap = responseData is Map<String, dynamic>
+          ? responseData
+          : const <String, dynamic>{};
+
+      return OrderSummaryResponse.fromJson(responseMap);
+    } on DioException catch (error, stackTrace) {
+      _logger.e(
+        'Order summary fetch failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to load order summary.',
+      );
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Unexpected order summary error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error is OrderCreateException) {
+        rethrow;
+      }
+      throw const OrderCreateException('Failed to load order summary.');
     }
   }
 

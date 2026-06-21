@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
-import '../../../../core/widgets/primary_action_button.dart';
 import '../../../auth/domain/usecases/sign_out.dart';
 import '../../domain/entities/print_category_entity.dart';
 import '../../../upload/presentation/pages/upload_documents_page.dart'
@@ -50,9 +49,14 @@ class _HomeViewState extends State<_HomeView> {
     return displayName.split(RegExp(r'\s+')).first;
   }
 
-  void _openUploadDocuments() {
+  void _openUploadDocuments([PrintCategoryEntity? category]) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const UploadDocumentsPage()),
+      MaterialPageRoute<void>(
+        builder: (_) => UploadDocumentsPage(
+          categoryName: category?.printType,
+          categoryRate: category?.rate,
+        ),
+      ),
     );
   }
 
@@ -174,7 +178,7 @@ class _HomeViewState extends State<_HomeView> {
                         ),
                         SizedBox(height: _r(context, 4)),
                         Text(
-                          'Hi, ${_greetingName()}👋',
+                          'Hi, ${_greetingName().capitalizeFirst()}👋',
                           style: TextStyle(
                             fontSize: _r(context, 24),
                             fontWeight: FontWeight.w700,
@@ -414,7 +418,7 @@ class _ServicesGrid extends StatelessWidget {
   const _ServicesGrid({required this.categories, required this.onPrintTap});
 
   final List<PrintCategoryEntity> categories;
-  final VoidCallback onPrintTap;
+  final ValueChanged<PrintCategoryEntity> onPrintTap;
 
   @override
   Widget build(BuildContext context) {
@@ -422,7 +426,7 @@ class _ServicesGrid extends StatelessWidget {
     if (categories.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: EdgeInsets.all(16 * compact),
+        padding: EdgeInsets.all(10 * compact),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20 * compact),
@@ -442,9 +446,9 @@ class _ServicesGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
       crossAxisCount: 2,
-      mainAxisSpacing: 12 * compact,
-      crossAxisSpacing: 12 * compact,
-      childAspectRatio: 0.95,
+      mainAxisSpacing: 15 * compact,
+      crossAxisSpacing: 15 * compact,
+      childAspectRatio: 1.8,
       children: List.generate(categories.length, (index) {
         final category = categories[index];
         return _ServiceTile(
@@ -453,7 +457,7 @@ class _ServicesGrid extends StatelessWidget {
           background: _resolveTileColor(index),
           titleColor: _resolveTitleColor(index),
           subtitleColor: _resolveSubtitleColor(index),
-          onTap: onPrintTap,
+          onTap: () => onPrintTap(category),
         );
       }),
     );
@@ -479,60 +483,97 @@ class _ServiceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = _screenScale(context);
+    final compact = 1.0; //_screenScale(context);
     return SizedBox(
       child: Material(
         color: background,
-        borderRadius: BorderRadius.circular(24 * compact),
+        borderRadius: BorderRadius.circular(24),
+        elevation: 6,
         child: InkWell(
-          borderRadius: BorderRadius.circular(24 * compact),
+          borderRadius: BorderRadius.circular(24),
           onTap: onTap,
           child: Padding(
-            padding: EdgeInsets.all(12 * compact),
+            padding: EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: background.computeLuminance() < 0.4
-                        ? Colors.white.withValues(
-                            alpha: 0.15,
-                          ) // light overlay for dark bg
-                        : Colors.black.withValues(
-                            alpha: 0.05,
-                          ), // dark overlay for light bg
-                    shape: BoxShape.circle,
-                  ),
-                  child: ClipOval(
-                    child: _AvatarIcon(
-                      avatarUrl: category.avatar,
-                      fallbackIcon: icon,
-                      iconColor: const Color(0xFFE6DAFF),
-                      compact: compact,
+                Row(
+                  children: [
+                    // Container(
+                    //   width: 50,
+                    //   height: 50,
+                    //   decoration: BoxDecoration(
+                    //     color: background.computeLuminance() < 0.4
+                    //         ? const Color.fromARGB(
+                    //             255,
+                    //             177,
+                    //             191,
+                    //             216,
+                    //           ).withValues(
+                    //             alpha: 0.15,
+                    //           ) // light overlay for dark bg
+                    //         : Colors.black.withValues(alpha: 0.05),
+                    //     // dark overlay for light bg
+                    //     shape: BoxShape.circle,
+                    //   ),
+                    //   child: ClipOval(
+                    //     child: _AvatarIcon(
+                    //       avatarUrl: category.avatar,
+                    //       fallbackIcon: icon,
+                    //       iconColor: const Color.fromARGB(255, 113, 89, 169),
+                    //       compact: compact,
+                    //     ),
+                    //   ),
+                    // ),
+                    Container(
+                      width: 50 * compact,
+                      height: 50 * compact,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE4DDF8),
+                        shape: BoxShape.circle,
+                      ),
+                      child: _AvatarIcon(
+                        avatarUrl: category.avatar,
+                        fallbackIcon: icon,
+                        iconColor: const Color.fromARGB(255, 113, 89, 169),
+                        compact: compact,
+                      ),
                     ),
-                  ),
+
+                    SizedBox(width: 12 * compact),
+                    Expanded(
+                      child: Text(
+                        category.printType.capitalizeFirst(),
+                        style: TextStyle(
+                          color: titleColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 //  const Spacer(),
-                Text(
-                  category.printType,
-                  style: TextStyle(
-                    color: titleColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
-                  ),
-                ),
                 SizedBox(height: 6 * compact),
-                Text(
-                  'Rate: Rs. ${category.rate}',
-                  style: TextStyle(
-                    color: subtitleColor,
-                    fontSize: 13 * compact,
-                    height: 1.25,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10.0),
+                      child: Text(
+                        '₹ ${category.rate}',
+                        style: TextStyle(
+                          color: subtitleColor,
+                          fontSize: 12 * compact,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -540,6 +581,13 @@ class _ServiceTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+extension StringExtension on String {
+  String capitalizeFirst() {
+    if (this.isEmpty) return "";
+    return this[0].toUpperCase() + this.substring(1).toLowerCase();
   }
 }
 
@@ -598,8 +646,8 @@ IconData _resolveCategoryIcon(String printType) {
 Color _resolveTileColor(int index) {
   const palette = <Color>[
     Color(0xFFFFFFFF),
-    Color(0xFF5B38D0),
-    Color(0xFFE4DEEF),
+    Color(0xFFFFFFFF),
+    Color(0xFFFFFFFF),
     Color(0xFFFFFFFF),
   ];
   return palette[index % palette.length];
@@ -607,10 +655,10 @@ Color _resolveTileColor(int index) {
 
 Color _resolveTitleColor(int index) {
   const palette = <Color>[
-    Color(0xFF252230),
-    Color(0xFFECE6FF),
-    Color(0xFF272430),
-    Color(0xFF24222B),
+    Color.fromARGB(255, 55, 52, 66),
+    Color.fromARGB(255, 55, 52, 66),
+    Color.fromARGB(255, 55, 52, 66),
+    Color.fromARGB(255, 55, 52, 66),
   ];
   return palette[index % palette.length];
 }
@@ -618,7 +666,7 @@ Color _resolveTitleColor(int index) {
 Color _resolveSubtitleColor(int index) {
   const palette = <Color>[
     Color(0xFF4A4657),
-    Color(0xFFD6CCF7),
+    Color(0xFF4A4657),
     Color(0xFF4F4A5D),
     Color(0xFF4E495A),
   ];
