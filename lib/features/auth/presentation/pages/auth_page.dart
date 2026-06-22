@@ -4,8 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_dimensions.dart';
-import '../../../../core/di/injection.dart';
-import '../../../../core/storage/temporary_auth_store.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -20,123 +18,22 @@ class AuthPage extends StatefulWidget {
 class _AuthPageState extends State<AuthPage> {
   bool _isMobileDialogOpen = false;
 
-  void _continue(BuildContext context) {
-    Navigator.of(context).pushReplacementNamed(AppRouter.main);
-  }
-
-  Future<void> _showMobileFallbackDialog(
-    String email,
-    String pendingToken,
-  ) async {
-    if (_isMobileDialogOpen) return;
-    _isMobileDialogOpen = true;
-
-    final mobileController = TextEditingController();
-    final tokenController = TextEditingController(text: pendingToken);
-    final formKey = GlobalKey<FormState>();
-
-    final result = await showDialog<({String mobile, String token})>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Enter mobile and token'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  email,
-                  style: const TextStyle(fontSize: 13, color: Colors.black54),
-                ),
-                const SizedBox(height: AppDimensions.spacing12),
-                TextFormField(
-                  controller: mobileController,
-                  keyboardType: TextInputType.phone,
-                  maxLength: 10,
-                  decoration: const InputDecoration(
-                    labelText: 'Mobile number',
-                    hintText: '9730727585',
-                    counterText: '',
-                  ),
-                  validator: (value) {
-                    final input = (value ?? '').trim();
-                    if (input.isEmpty) {
-                      return 'Mobile number is required';
-                    }
-
-                    final isValid = RegExp(r'^\d{10,15}$').hasMatch(input);
-                    if (!isValid) {
-                      return 'Enter a valid mobile number';
-                    }
-
-                    return null;
-                  },
-                ),
-                const SizedBox(height: AppDimensions.spacing12),
-                TextFormField(
-                  controller: tokenController,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'API token (temporary)',
-                    hintText: 'Paste token here',
-                  ),
-                  validator: (value) {
-                    final input = (value ?? '').trim();
-                    if (input.isEmpty) {
-                      return 'Token is required';
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() != true) {
-                  return;
-                }
-                Navigator.of(dialogContext).pop((
-                  mobile: mobileController.text.trim(),
-                  token: tokenController.text.trim(),
-                ));
-              },
-              child: const Text('Continue.'),
-            ),
-          ],
-        );
-      },
-    );
-
-    _isMobileDialogOpen = false;
-
-    if (!mounted || result == null) {
-      return;
-    }
-
-    await sl<TemporaryAuthStore>().save(
-      mobile: result.mobile,
-      token: result.token,
-    );
-
-    context.read<AuthBloc>().add(
-      AuthManualMobileSubmitted(mobile: result.mobile, token: result.token),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
+          if (state.nextStep == AuthNextStep.enterMobile) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) {
+                return;
+              }
+
+              _showMobileNumberDialog(context, state);
+            });
+            return;
+          }
+
           if (state.status == AuthStatus.success) {
             Navigator.of(context).pushReplacementNamed(AppRouter.main);
           }
@@ -145,14 +42,6 @@ class _AuthPageState extends State<AuthPage> {
             ScaffoldMessenger.of(context)
               ..clearSnackBars()
               ..showSnackBar(const SnackBar(content: Text('Logged out')));
-          }
-
-          if (state.nextStep == AuthNextStep.enterMobile &&
-              state.pendingEmail.isNotEmpty) {
-            _showMobileFallbackDialog(
-              state.pendingEmail,
-              state.pendingAuthToken,
-            );
           }
 
           if (state.status == AuthStatus.failure &&
@@ -539,6 +428,42 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
+  Future<void> _showMobileNumberDialog(
+    BuildContext context,
+    AuthState state,
+  ) async {
+    if (_isMobileDialogOpen || !mounted) {
+      return;
+    }
+
+    _isMobileDialogOpen = true;
+
+    try {
+      final mobile = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => const _MobileNumberDialog(),
+      );
+
+      if (!mounted || mobile == null || mobile.isEmpty) {
+        return;
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      context.read<AuthBloc>().add(
+        AuthManualMobileSubmitted(
+          mobile: mobile,
+          token: state.pendingAuthToken,
+        ),
+      );
+    } finally {
+      _isMobileDialogOpen = false;
+    }
+  }
+
   Widget _buildBackgroundShapes(double scale) {
     return IgnorePointer(
       child: Stack(
@@ -655,6 +580,64 @@ class _FadedShape extends StatelessWidget {
         color: AppColors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppDimensions.radius52),
       ),
+    );
+  }
+}
+
+class _MobileNumberDialog extends StatefulWidget {
+  const _MobileNumberDialog();
+
+  @override
+  State<_MobileNumberDialog> createState() => _MobileNumberDialogState();
+}
+
+class _MobileNumberDialogState extends State<_MobileNumberDialog> {
+  final TextEditingController _mobileController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _mobileController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.of(context).pop(_mobileController.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add mobile number'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _mobileController,
+          autofocus: true,
+          keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(
+            labelText: 'Mobile number',
+            hintText: 'Enter your mobile number',
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Mobile number is required';
+            }
+            return null;
+          },
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Continue')),
+      ],
     );
   }
 }

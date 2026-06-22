@@ -36,9 +36,9 @@ class UploadDriveService {
     required FirebaseAuth firebaseAuth,
     required DioClient dioClient,
     required Logger logger,
-  })  : _firebaseAuth = firebaseAuth,
-        _dioClient = dioClient,
-        _logger = logger;
+  }) : _firebaseAuth = firebaseAuth,
+       _dioClient = dioClient,
+       _logger = logger;
 
   final FirebaseAuth _firebaseAuth;
   final DioClient _dioClient;
@@ -52,7 +52,7 @@ class UploadDriveService {
   /// Google Drive via the print-hub backend, and confirming the upload.
   ///
   /// Shows inline progress feedback via a [SnackBar] overlay.
-  /// [context] must be mounted for the duration of the call.
+  /// [context] must be mounted for the duration of the call.Rr
   Future<void> uploadFileToDrive(BuildContext context) async {
     // --- 1. Pick file -------------------------------------------------------
     final picked = await _pickFile();
@@ -87,7 +87,9 @@ class UploadDriveService {
       final idToken = await _getFirebaseToken();
 
       // --- 5. Request upload URL from backend -----------------------------
-      progressNotifier.value = const _UploadProgress(phase: _Phase.requestingUrl);
+      progressNotifier.value = const _UploadProgress(
+        phase: _Phase.requestingUrl,
+      );
 
       final session = await _requestUploadSession(
         idToken: idToken,
@@ -97,7 +99,10 @@ class UploadDriveService {
       );
 
       // --- 6. Upload bytes to Google --------------------------------------
-      progressNotifier.value = const _UploadProgress(phase: _Phase.uploading, percent: 0);
+      progressNotifier.value = const _UploadProgress(
+        phase: _Phase.uploading,
+        percent: 0,
+      );
 
       await _uploadToStorage(
         uploadUrl: session.uploadUrl,
@@ -131,7 +136,10 @@ class UploadDriveService {
       _logger.e('Firebase auth error during upload', error: e, stackTrace: st);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      _showError(context, 'Authentication error: ${e.message ?? 'please sign in again'}');
+      _showError(
+        context,
+        'Authentication error: ${e.message ?? 'please sign in again'}',
+      );
     } on _UploadException catch (e) {
       _logger.e('Upload failed: ${e.message}');
       if (!context.mounted) return;
@@ -176,11 +184,15 @@ class UploadDriveService {
   Future<String> _getFirebaseToken() async {
     final user = _firebaseAuth.currentUser;
     if (user == null) {
-      throw const _UploadException('You are not signed in. Please sign in and try again.');
+      throw const _UploadException(
+        'You are not signed in. Please sign in and try again.',
+      );
     }
     final token = await user.getIdToken(true);
     if (token == null || token.isEmpty) {
-      throw const _UploadException('Could not retrieve authentication token. Please sign in again.');
+      throw const _UploadException(
+        'Could not retrieve authentication token. Please sign in again.',
+      );
     }
     return token;
   }
@@ -207,20 +219,29 @@ class UploadDriveService {
 
       final data = response.data;
       if (data is! Map<String, dynamic>) {
-        throw const _UploadException('Unexpected response from upload service.');
+        throw const _UploadException(
+          'Unexpected response from upload service.',
+        );
       }
 
       final uploadUrl = data['uploadUrl']?.toString();
       final uploadSessionId = data['uploadSessionId']?.toString();
 
       if (uploadUrl == null || uploadUrl.isEmpty) {
-        throw const _UploadException('Upload service did not return a valid upload URL.');
+        throw const _UploadException(
+          'Upload service did not return a valid upload URL.',
+        );
       }
       if (uploadSessionId == null || uploadSessionId.isEmpty) {
-        throw const _UploadException('Upload service did not return a session ID.');
+        throw const _UploadException(
+          'Upload service did not return a session ID.',
+        );
       }
 
-      return _UploadSession(uploadUrl: uploadUrl, uploadSessionId: uploadSessionId);
+      return _UploadSession(
+        uploadUrl: uploadUrl,
+        uploadSessionId: uploadSessionId,
+      );
     } on DioException catch (e) {
       final msg = _extractBackendMessage(e) ?? 'Failed to request upload URL.';
       throw _UploadException(msg);
@@ -256,10 +277,7 @@ class UploadDriveService {
           uploadUrl,
           data: bytes,
           options: Options(
-            headers: {
-              'Content-Type': mimeType,
-              'Content-Length': fileSize,
-            },
+            headers: {'Content-Type': mimeType, 'Content-Length': fileSize},
             sendTimeout: _uploadTimeout,
             receiveTimeout: _uploadTimeout,
           ),
@@ -272,7 +290,11 @@ class UploadDriveService {
 
         return; // success
       } on DioException catch (e, st) {
-        _logger.w('Upload attempt $attempt/$_maxRetries failed', error: e, stackTrace: st);
+        _logger.w(
+          'Upload attempt $attempt/$_maxRetries failed',
+          error: e,
+          stackTrace: st,
+        );
         lastError = e;
         if (attempt < _maxRetries) {
           await Future<void>.delayed(Duration(seconds: attempt * 2));
@@ -281,7 +303,8 @@ class UploadDriveService {
     }
 
     final msg = lastError != null
-        ? (_extractBackendMessage(lastError) ?? 'File upload failed after $_maxRetries attempts.')
+        ? (_extractBackendMessage(lastError) ??
+              'File upload failed after $_maxRetries attempts.')
         : 'File upload failed after $_maxRetries attempts.';
     throw _UploadException(msg);
   }
@@ -306,7 +329,8 @@ class UploadDriveService {
         },
       );
     } on DioException catch (e) {
-      final msg = _extractBackendMessage(e) ?? 'Failed to confirm upload with server.';
+      final msg =
+          _extractBackendMessage(e) ?? 'Failed to confirm upload with server.';
       throw _UploadException(msg);
     }
   }
@@ -352,7 +376,10 @@ class UploadDriveService {
             Expanded(
               child: Text(
                 '"$fileName" uploaded successfully.',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -372,10 +399,7 @@ class UploadDriveService {
             const Icon(Icons.error_outline_rounded, color: Colors.white),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(color: Colors.white),
-              ),
+              child: Text(message, style: const TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -394,7 +418,8 @@ class UploadDriveService {
       'jpg': 'image/jpeg',
       'jpeg': 'image/jpeg',
       'png': 'image/png',
-      'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'docx':
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     }[ext];
   }
 
@@ -412,7 +437,10 @@ class UploadDriveService {
 // ---------------------------------------------------------------------------
 
 class _UploadSession {
-  const _UploadSession({required this.uploadUrl, required this.uploadSessionId});
+  const _UploadSession({
+    required this.uploadUrl,
+    required this.uploadSessionId,
+  });
   final String uploadUrl;
   final String uploadSessionId;
 }
@@ -470,7 +498,11 @@ class _UploadProgressContent extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(Icons.upload_file_rounded, color: Colors.white, size: 20),
+            const Icon(
+              Icons.upload_file_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(

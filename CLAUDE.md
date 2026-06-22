@@ -35,6 +35,48 @@ flutter analyze
 flutter test
 ```
 
+## Stitch MCP Connection
+
+Use Stitch through MCP with a local API key (do not commit secrets into git).
+
+### 1) Set API key in PowerShell (Windows)
+
+```powershell
+# Current terminal session
+$env:STITCH_API_KEY = "<>"
+
+# Persist for future sessions
+setx STITCH_API_KEY "<>"
+```
+
+Replace `<YOUR_STITCH_MCP_KEY>` with your real key.
+
+### 2) Configure Claude MCP server
+
+Create or update MCP server config used by Claude Code so it starts Stitch with the env var:
+
+```json
+{
+    "mcpServers": {
+        "stitch": {
+            "command": "npx",
+            "args": ["-y", "@google/stitch-mcp"],
+            "env": {
+                "STITCH_API_KEY": "${}"
+            }
+        }
+    }
+}
+```
+
+### 3) Restart tool session
+
+Restart VS Code / Claude Code agent session after setting env vars so the Stitch MCP server can pick up `STITCH_API_KEY`.
+
+### 4) Verify connection
+
+Use Stitch MCP commands such as listing projects or screens. If those commands return data, Stitch is connected.
+
 ## App Flavors
 
 | Flavor | Package ID | Purpose |

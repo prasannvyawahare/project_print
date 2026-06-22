@@ -17,6 +17,15 @@ import '../../features/auth/domain/usecases/sign_in_with_google.dart';
 import '../../features/auth/domain/usecases/sign_out.dart';
 import '../../features/auth/domain/usecases/verify_and_save_user.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/delivery/data/datasources/address_remote_data_source.dart';
+import '../../features/delivery/data/repositories/address_repository_impl.dart';
+import '../../features/delivery/domain/repositories/address_repository.dart';
+import '../../features/delivery/domain/usecases/create_address.dart';
+import '../../features/delivery/domain/usecases/get_addresses.dart';
+import '../../features/delivery/domain/usecases/remove_address.dart';
+import '../../features/delivery/domain/usecases/select_address.dart';
+import '../../features/delivery/presentation/bloc/address_bloc.dart';
+import '../../features/upload/data/datasources/order_remote_data_source.dart';
 import '../../features/home/data/datasources/home_remote_data_source.dart';
 import '../../features/home/data/datasources/home_local_data_source.dart';
 import '../../features/home/data/repositories/home_repository_impl.dart';
@@ -146,5 +155,55 @@ Future<void> initDependencies() async {
 
   sl.registerFactory<HomeBloc>(
     () => HomeBloc(getPrintCategories: sl<GetPrintCategories>()),
+  );
+
+  // Address feature
+  sl.registerLazySingleton<AddressRemoteDataSource>(
+    () => AddressRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<AddressRepository>(
+    () => AddressRepositoryImpl(
+      remoteDataSource: sl<AddressRemoteDataSource>(),
+      networkInfo: sl<NetworkInfo>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<CreateAddress>(
+    () => CreateAddress(sl<AddressRepository>()),
+  );
+
+  sl.registerLazySingleton<GetAddresses>(
+    () => GetAddresses(sl<AddressRepository>()),
+  );
+
+  sl.registerLazySingleton<RemoveAddress>(
+    () => RemoveAddress(sl<AddressRepository>()),
+  );
+
+  sl.registerLazySingleton<SelectAddress>(
+    () => SelectAddress(sl<AddressRepository>()),
+  );
+
+  sl.registerFactory<AddressBloc>(
+    () => AddressBloc(
+      createAddress: sl<CreateAddress>(),
+      getAddresses: sl<GetAddresses>(),
+      removeAddress: sl<RemoveAddress>(),
+      selectAddress: sl<SelectAddress>(),
+    ),
+  );
+
+  sl.registerLazySingleton<OrderRemoteDataSource>(
+    () => OrderRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      temporaryAuthStore: sl<TemporaryAuthStore>(),
+      firebaseAuth: sl<FirebaseAuth>(),
+      logger: sl<Logger>(),
+    ),
   );
 }

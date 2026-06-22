@@ -42,125 +42,145 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final TemporaryAuthStore _temporaryAuthStore;
   final Logger _logger;
 
-  @override
-Future<AuthUserModel> signInWithGoogle() async {
-  try {
-    // Step 1 — Google Sign-In
-    final GoogleSignInAccount account =
-        await _googleSignIn.authenticate();
-
-    final GoogleSignInAuthentication googleAuth =
-        account.authentication;
-
-    if (googleAuth.idToken == null) {
-      throw ServerException(
-        message: 'Google sign-in failed: missing ID token.',
-      );
+  String _extractStringValue(dynamic value) {
+    if (value is String) {
+      return value.trim();
     }
-
-    // Step 2 — Create Firebase Credential
-    final OAuthCredential credential =
-        GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
-    );
-
-    // Step 3 — Firebase Sign-In
-    final userCredential =
-        await _firebaseAuth.signInWithCredential(
-      credential,
-    );
-
-    final user = userCredential.user;
-
-    if (user == null) {
-      throw ServerException(
-        message: 'Firebase user not available.',
-      );
+    if (value is num || value is bool) {
+      return value.toString().trim();
     }
-
-    final String email =
-        user.email ?? account.email;
-
-    final String? mobile =
-        user.phoneNumber;
-
-    if (email.isEmpty) {
-      throw ServerException(
-        message: 'Google account email not available.',
-      );
-    }
-
-    // Step 4 — Get Firebase ID Token
-    // getIdToken(true) force-refreshes so we always get a Firebase-issued
-    // JWT (aud = project ID), never the raw Google OpenID token.
-    final String? firebaseIdToken = await user.getIdToken(true);
-
-    if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
-      throw ServerException(
-        message: 'Failed to retrieve Firebase ID token.',
-      );
-    }
-
-    _logger.i('=== AUTH TOKENS ===');
-    _logger.i('Google ID token : ${googleAuth.idToken}');
-    _logger.i('Firebase ID token: $firebaseIdToken');
-    _logger.i('==================+');
-
-    await _temporaryAuthStore.save(
-      mobile: mobile?.trim() ?? '',
-      token: firebaseIdToken,
-    );
-
-    return AuthUserModel(
-      email: email,
-      mobile: mobile,
-      authToken: firebaseIdToken,
-    );
-
-  } on ServerException {
-    rethrow;
-  } on FirebaseAuthException catch (error) {
-    _logger.e(
-      'Firebase auth error',
-      error: error,
-      stackTrace: error.stackTrace,
-    );
-
-    throw ServerException(
-      message: error.message ?? 'Authentication failed',
-    );
-
-  } on GoogleSignInException catch (error, stackTrace) {
-    _logger.e(
-      'Google sign-in error: ${error.code}',
-      error: error,
-      stackTrace: stackTrace,
-    );
-
-    if (error.code ==
-        GoogleSignInExceptionCode.canceled) {
-      throw ServerException(
-        message: 'Sign-in was cancelled.',
-      );
-    }
-
-    throw ServerException(
-      message:
-          'Google sign-in failed (${error.code.name})',
-    );
-
-  } catch (error, stackTrace) {
-    _logger.e(
-      'Google sign-in error',
-      error: error,
-      stackTrace: stackTrace,
-    );
-
-    throw ServerException(
-      message: 'Unable to sign in with Google',
-    );
+    return '';
   }
-}
+
+  String _firstNonEmptyString(Iterable<dynamic> values) {
+    for (final value in values) {
+      final parsed = _extractStringValue(value);
+      if (parsed.isNotEmpty) {
+        return parsed;
+      }
+    }
+    return '';
+  }
+
+  bool? _extractBoolValue(dynamic value) {
+    if (value is bool) {
+      return value;
+    }
+
+    if (value is num) {
+      return value != 0;
+    }
+
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+        return false;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Future<AuthUserModel> signInWithGoogle() async {
+    try {
+      await _googleSignIn.signOut();
+
+      // Step 1 — Google Sign-In
+      final GoogleSignInAccount account = await _googleSignIn.authenticate();
+
+      final GoogleSignInAuthentication googleAuth = account.authentication;
+
+      if (googleAuth.idToken == null) {
+        throw ServerException(
+          message: 'Google sign-in failed: missing ID token.',
+        );
+      }
+
+      // Step 2 — Create Firebase Credential
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+
+      // Step 3 — Firebase Sign-In
+      final userCredential = await _firebaseAuth.signInWithCredential(
+        credential,
+      );
+
+      final user = userCredential.user;
+
+      if (user == null) {
+        throw ServerException(message: 'Firebase user not available.');
+      }
+
+      final String email = user.email ?? account.email;
+      final String displayName = user.displayName ?? account.displayName ?? '';
+
+      final String? mobile = user.phoneNumber;
+
+      if (email.isEmpty) {
+        throw ServerException(message: 'Google account email not available.');
+      }
+
+      // Step 4 — Get Firebase ID Token
+      // getIdToken(true) force-refreshes so we always get a Firebase-issued
+      // JWT (aud = project ID), never the raw Google OpenID token.
+      final String? firebaseIdToken = await user.getIdToken(true);
+
+      if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+        throw ServerException(message: 'Failed to retrieve Firebase ID token.');
+      }
+
+      _logger.i('=== AUTH TOKENS ===');
+      _logger.i('Google ID token : ${googleAuth.idToken}');
+      _logger.i('Firebase ID token: $firebaseIdToken');
+      _logger.i('==================+');
+
+      await _temporaryAuthStore.save(
+        mobile: mobile?.trim() ?? '',
+        token: firebaseIdToken,
+        displayName: displayName,
+      );
+
+      return AuthUserModel(
+        email: email,
+        displayName: displayName,
+        mobile: mobile,
+        authToken: firebaseIdToken,
+      );
+    } on ServerException {
+      rethrow;
+    } on FirebaseAuthException catch (error) {
+      _logger.e(
+        'Firebase auth error',
+        error: error,
+        stackTrace: error.stackTrace,
+      );
+
+      throw ServerException(message: error.message ?? 'Authentication failed');
+    } on GoogleSignInException catch (error, stackTrace) {
+      _logger.e(
+        'Google sign-in error: ${error.code}',
+        error: error,
+        stackTrace: stackTrace,
+      );
+
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        throw ServerException(message: 'Sign-in was cancelled.');
+      }
+
+      throw ServerException(
+        message: 'Google sign-in failed (${error.code.name})',
+      );
+    } catch (error, stackTrace) {
+      _logger.e('Google sign-in error', error: error, stackTrace: stackTrace);
+
+      throw ServerException(message: 'Unable to sign in with Google');
+    }
+  }
 
   @override
   Future<String> verifyAndSaveUser({
@@ -195,12 +215,48 @@ Future<AuthUserModel> signInWithGoogle() async {
       );
 
       final responseData = response.data;
-      final userId = (responseData is Map<String, dynamic>)
-          ? (responseData['data']?['id']?.toString() ?? '')
-          : '';
+      final map = responseData is Map<String, dynamic>
+          ? responseData
+          : const <String, dynamic>{};
+      final data = map['data'] is Map<String, dynamic>
+          ? map['data'] as Map<String, dynamic>
+          : const <String, dynamic>{};
+
+      final userId = _firstNonEmptyString([
+        data['_id'],
+        data['id'],
+        data['userId'],
+        (data['user'] is Map<String, dynamic>)
+            ? (data['user'] as Map<String, dynamic>)['id']
+            : null,
+        map['_id'],
+        map['id'],
+        map['userId'],
+      ]);
+
+      final backendToken = _firstNonEmptyString([
+        data['token'],
+        data['accessToken'],
+        data['authToken'],
+        data['jwt'],
+        map['token'],
+        map['accessToken'],
+        map['authToken'],
+        map['jwt'],
+      ]);
 
       if (userId.isNotEmpty) {
         await _temporaryAuthStore.saveUserId(userId);
+      }
+
+      if (backendToken.isNotEmpty && backendToken != trimmedToken) {
+        _logger.i(
+          'Switching to backend session token from verify-and-save response',
+        );
+        await _temporaryAuthStore.save(
+          mobile: trimmedMobile,
+          token: backendToken,
+        );
       }
 
       return userId;
@@ -232,17 +288,33 @@ Future<AuthUserModel> signInWithGoogle() async {
       );
       final responseData = response.data;
       if (responseData is Map<String, dynamic>) {
-        return responseData['success'] == true;
+        final data = responseData['data'];
+        final nestedData = data is Map<String, dynamic>
+            ? data
+            : const <String, dynamic>{};
+
+        final parsed =
+            _extractBoolValue(responseData['exists']) ??
+            _extractBoolValue(responseData['success']) ??
+            _extractBoolValue(nestedData['exists']) ??
+            _extractBoolValue(nestedData['storageExists']) ??
+            _extractBoolValue(nestedData['isStorageExists']);
+
+        if (parsed != null) {
+          return parsed;
+        }
       }
       return false;
     } on DioException catch (error) {
+      final statusCode = error.response?.statusCode;
       final data = error.response?.data;
       final backendMessage = data is Map<String, dynamic>
           ? (data['message']?.toString() ?? data['error']?.toString())
           : null;
+
       throw ServerException(
         message: backendMessage ?? error.message ?? 'Failed to check storage',
-        statusCode: error.response?.statusCode,
+        statusCode: statusCode,
       );
     } catch (error, stackTrace) {
       _logger.e('Check storage failed', error: error, stackTrace: stackTrace);
@@ -256,7 +328,7 @@ Future<AuthUserModel> signInWithGoogle() async {
     try {
       await _dioClient.post(
         path: ApiConstants.createStorage,
-        data: {'id': userId},
+        data: {'id': userId, '_id': userId, 'userId': userId},
         headers: {'content-type': 'application/json'},
       );
     } on DioException catch (error) {

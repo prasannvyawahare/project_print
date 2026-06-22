@@ -6,12 +6,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
 
+import '../../../../core/di/injection.dart';
 import '../../../delivery/presentation/pages/delivery_address_page.dart';
 import '../../../print/domain/entities/print_order_data.dart';
 import '../../../print/presentation/bloc/print_flow_bloc.dart';
 import '../../../print/presentation/bloc/print_flow_event.dart';
 import '../../../print/presentation/bloc/print_flow_state.dart';
 import '../../../print/presentation/pages/configure_print_page.dart';
+import '../../data/datasources/order_remote_data_source.dart';
 
 double _screenScale(BuildContext context) {
   final size = MediaQuery.sizeOf(context);
@@ -32,6 +34,7 @@ class UploadDocumentsPage extends StatefulWidget {
 class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
   final ImagePicker _imagePicker = ImagePicker();
   late final PrintFlowBloc _flowBloc;
+  bool _isCreatingOrder = false;
 
   @override
   void initState() {
@@ -297,6 +300,10 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
   }
 
   Future<void> _goToNextStep() async {
+    if (_isCreatingOrder) {
+      return;
+    }
+
     final state = _flowBloc.state;
     if (state.files.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -319,11 +326,80 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => DeliveryAddressPage(initialOrder: mergedOrder),
-      ),
-    );
+    final orderItems = _buildOrderItems(state);
+
+    setState(() {
+      _isCreatingOrder = true;
+    });
+
+    try {
+      final orderId = await sl<OrderRemoteDataSource>().createOrder(
+        items: orderItems,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              DeliveryAddressPage(initialOrder: mergedOrder, orderId: orderId),
+        ),
+      );
+    } on OrderCreateException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreatingOrder = false;
+        });
+      }
+    }
+  }
+
+  List<OrderCreateItem> _buildOrderItems(PrintFlowState state) {
+    return state.files.map((file) {
+      final config = state.configurations[file.path] ?? state.configFor(file);
+      return OrderCreateItem(
+        fileName: file.name,
+        fileType: _fileTypeFor(file.name),
+        numberOfCopy: config.copies,
+        samePage: config.pageFrom == config.pageTo,
+        printType: _printTypeFor(config),
+      );
+    }).toList();
+  }
+
+  String _fileTypeFor(String fileName) {
+    final lower = fileName.toLowerCase();
+    final dotIndex = lower.lastIndexOf('.');
+    if (dotIndex == -1 || dotIndex == lower.length - 1) {
+      return 'unknown';
+    }
+    return lower.substring(dotIndex + 1);
+  }
+
+  String _printTypeFor(FilePrintConfiguration config) {
+    final paperSize = switch (config.paperSize) {
+      'A4 (Standard)' => 'A4',
+      'A3' => 'A3',
+      'Letter' => 'Letter',
+      _ => config.paperSize,
+    };
+
+    return switch (config.printOption) {
+      PrintServiceOption.color => 'COLOR $paperSize',
+      PrintServiceOption.blackWhite => 'B&W $paperSize',
+      PrintServiceOption.banner => 'BANNER',
+      PrintServiceOption.spiral => 'SPIRAL',
+      PrintServiceOption.other => paperSize,
+    };
   }
 
   @override
@@ -575,27 +651,38 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(_r(context, 28)),
-                  onTap: _goToNextStep,
+                  onTap: _isCreatingOrder ? null : _goToNextStep,
                   child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Continue to Print',
-                          style: TextStyle(
-                            fontSize: _r(context, 17),
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                    child: _isCreatingOrder
+                        ? SizedBox(
+                            width: _r(context, 22),
+                            height: _r(context, 22),
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
+                            ),
+                          )
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Continue to Print',
+                                style: TextStyle(
+                                  fontSize: _r(context, 17),
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(width: _r(context, 6)),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                color: Colors.white,
+                                size: _r(context, 22),
+                              ),
+                            ],
                           ),
-                        ),
-                        SizedBox(width: _r(context, 6)),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: _r(context, 22),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               ),

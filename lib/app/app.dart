@@ -12,7 +12,12 @@ class App extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: AppConstants.appName,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          primary: Colors.indigo,
+          secondary: Color(0xFF35D0D0),
+          tertiary: Color(0xFFCA4600),
+        ),
         useMaterial3: true,
       ),
       onGenerateRoute: AppRouter.generateRoute,

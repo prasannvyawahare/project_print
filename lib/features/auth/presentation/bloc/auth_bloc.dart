@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/error/failures.dart';
+
 import '../../domain/usecases/check_storage_exists.dart';
 import '../../domain/usecases/create_storage.dart';
 import '../../domain/usecases/sign_in_with_apple.dart';
@@ -46,13 +48,59 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final storageResult = await _checkStorageExists();
 
     await storageResult.fold(
-      (failure) async => emit(
-        state.copyWith(
-          status: AuthStatus.failure,
-          errorMessage: failure.message,
-          nextStep: AuthNextStep.none,
-        ),
-      ),
+      (failure) async {
+        final isStorageCheck500 =
+            failure is ServerFailure && failure.statusCode == 500;
+
+        if (!isStorageCheck500) {
+          emit(
+            state.copyWith(
+              status: AuthStatus.failure,
+              errorMessage: failure.message,
+              nextStep: AuthNextStep.none,
+            ),
+          );
+          return;
+        }
+
+        // Requested flow for 500 from storage-exists:
+        // 1) create-storage with userId, 2) re-run storage-exists.
+        final createResult = await _createStorage(userId);
+
+        await createResult.fold(
+          (createFailure) async => emit(
+            state.copyWith(
+              status: AuthStatus.failure,
+              errorMessage: createFailure.message,
+              nextStep: AuthNextStep.none,
+            ),
+          ),
+          (_) async {
+            final recheckResult = await _checkStorageExists();
+
+            recheckResult.fold(
+              (recheckFailure) => emit(
+                state.copyWith(
+                  status: AuthStatus.failure,
+                  errorMessage: recheckFailure.message,
+                  nextStep: AuthNextStep.none,
+                ),
+              ),
+              (existsAfterCreate) => emit(
+                state.copyWith(
+                  status: existsAfterCreate
+                      ? AuthStatus.success
+                      : AuthStatus.failure,
+                  errorMessage: existsAfterCreate
+                      ? ''
+                      : 'Storage verification failed after create. Please retry.',
+                  nextStep: AuthNextStep.none,
+                ),
+              ),
+            );
+          },
+        );
+      },
       (exists) async {
         if (exists) {
           emit(
@@ -121,9 +169,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(
             state.copyWith(
               status: AuthStatus.initial,
+              errorMessage: '',
               pendingEmail: email,
               pendingAuthToken: authToken,
-              errorMessage: '',
               nextStep: AuthNextStep.enterMobile,
             ),
           );

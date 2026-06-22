@@ -7,6 +7,7 @@ class TemporaryAuthStore {
   static const String _mobileKey = 'temp_mobile_number';
   static const String _tokenKey = 'temp_api_token';
   static const String _userIdKey = 'temp_user_id';
+  static const String _displayNameKey = 'temp_display_name';
 
   final SharedPreferences _preferences;
 
@@ -16,9 +17,20 @@ class TemporaryAuthStore {
 
   String get userId => _preferences.getString(_userIdKey)?.trim() ?? '';
 
-  Future<void> save({required String mobile, required String token}) async {
+  String get displayName =>
+      _preferences.getString(_displayNameKey)?.trim() ?? '';
+
+  Future<void> save({
+    required String mobile,
+    required String token,
+    String? displayName,
+  }) async {
     await _preferences.setString(_mobileKey, mobile.trim());
     await _preferences.setString(_tokenKey, token.trim());
+
+    if (displayName != null) {
+      await _preferences.setString(_displayNameKey, displayName.trim());
+    }
   }
 
   Future<void> saveUserId(String userId) async {
@@ -29,5 +41,6 @@ class TemporaryAuthStore {
     await _preferences.remove(_mobileKey);
     await _preferences.remove(_tokenKey);
     await _preferences.remove(_userIdKey);
+    await _preferences.remove(_displayNameKey);
   }
 }

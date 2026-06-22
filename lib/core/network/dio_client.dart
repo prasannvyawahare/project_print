@@ -81,4 +81,40 @@ class DioClient {
       ),
     );
   }
+
+  Future<Response<dynamic>> delete({
+    required String path,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Map<String, dynamic>? headers,
+    bool omitContentType = false,
+  }) {
+    return _dio.delete<dynamic>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: Options(
+        headers: headers,
+        extra: {'omitContentType': omitContentType},
+      ),
+    );
+  }
+
+  Future<Response<dynamic>> patch({
+    required String path,
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    Map<String, dynamic>? headers,
+    bool omitContentType = false,
+  }) {
+    return _dio.patch<dynamic>(
+      path,
+      data: data,
+      queryParameters: queryParameters,
+      options: Options(
+        headers: headers,
+        extra: {'omitContentType': omitContentType},
+      ),
+    );
+  }
 }
