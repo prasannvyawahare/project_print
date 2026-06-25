@@ -8,7 +8,8 @@ import 'package:open_filex/open_filex.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/widgets/primary_action_button.dart';
-import '../../../delivery/presentation/pages/delivery_address_page.dart';
+import '../../../../core/widgets/printhub_app_bar.dart';
+import '../../../delivery/presentation/pages/order_review_page.dart';
 import '../../../print/domain/entities/print_order_data.dart';
 import '../../../print/presentation/bloc/print_flow_bloc.dart';
 import '../../../print/presentation/bloc/print_flow_event.dart';
@@ -355,7 +356,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) =>
-              DeliveryAddressPage(initialOrder: mergedOrder, orderId: orderId),
+              OrderReviewPage(initialOrder: mergedOrder, orderId: orderId),
         ),
       );
     } on OrderCreateException catch (error) {
@@ -426,49 +427,16 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
         body: SafeArea(
           child: Column(
             children: [
-              Container(
-                color: Colors.white,
-                padding: EdgeInsets.fromLTRB(
-                  _r(context, 12),
-                  _r(context, 8),
-                  _r(context, 12),
-                  _r(context, 10),
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: _r(context, 20),
-                      ),
-                      color: const Color(0xFF1E2433),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Upload Documents',
-                        style: TextStyle(
-                          fontSize: _r(context, 19),
-                          fontWeight: FontWeight.w700,
-                          color: titleColor,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: Icon(Icons.search_rounded, size: _r(context, 22)),
-                      color: const Color(0xFF1E2433),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      icon: Icon(
-                        Icons.notifications_none_rounded,
-                        size: _r(context, 22),
-                      ),
-                      color: accent,
-                    ),
-                  ],
-                ),
+              PrintHubAppBar(
+                title: 'Upload Documents',
+                showBack: true,
+                actions: [
+                  IconButton(
+                    onPressed: () {},
+                    icon: Icon(Icons.search_rounded, size: _r(context, 22)),
+                    color: const Color(0xFF1E2433),
+                  ),
+                ],
               ),
               Expanded(
                 child: BlocBuilder<PrintFlowBloc, PrintFlowState>(

@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/storage/active_job_store.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
+import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../auth/domain/usecases/sign_out.dart';
 import '../../domain/entities/print_category_entity.dart';
+import '../../../upload/presentation/pages/order_summary_page.dart'
+    show OrderSummaryPage;
 import '../../../upload/presentation/pages/upload_documents_page.dart'
     show UploadDocumentsPage;
 import '../bloc/home_bloc.dart';
@@ -20,6 +25,12 @@ double _screenScale(BuildContext context) {
 }
 
 double _r(BuildContext context, double value) => value * _screenScale(context);
+
+// ── Shared palette ─────────────────────────────────────────────────────────
+const _accent = Color(0xFF2563EB);
+const _pageBackground = Color(0xFFF6F8FC);
+const _primaryText = Color(0xFF1B1B2F);
+const _mutedText = Color(0xFF8B8B9C);
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -49,8 +60,14 @@ class _HomeViewState extends State<_HomeView> {
     return displayName.split(RegExp(r'\s+')).first;
   }
 
-  void _openUploadDocuments([PrintCategoryEntity? category]) {
-    Navigator.of(context).push(
+  List<ActiveJob> _activeJobs = const <ActiveJob>[];
+
+  void _loadActiveJobs() {
+    setState(() => _activeJobs = sl<ActiveJobStore>().getJobs());
+  }
+
+  Future<void> _openUploadDocuments([PrintCategoryEntity? category]) async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => UploadDocumentsPage(
           categoryName: category?.printType,
@@ -58,6 +75,21 @@ class _HomeViewState extends State<_HomeView> {
         ),
       ),
     );
+    if (!mounted) return;
+    _loadActiveJobs();
+  }
+
+  Future<void> _openActiveJob(ActiveJob job) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderSummaryPage(
+          orderId: job.orderId,
+          deliveryAddress: job.address,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _loadActiveJobs();
   }
 
   Future<void> _logout() async {
@@ -85,6 +117,7 @@ class _HomeViewState extends State<_HomeView> {
   @override
   void initState() {
     super.initState();
+    _activeJobs = sl<ActiveJobStore>().getJobs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<HomeBloc>().add(const HomeRequested());
@@ -94,14 +127,8 @@ class _HomeViewState extends State<_HomeView> {
 
   @override
   Widget build(BuildContext context) {
-    const pageBackground = Color(0xFFFFF7F6);
-    const accent = Color(0xFF6233DD);
-    const mutedText = Color(0xFF9A95A8);
-    const primaryText = Color(0xFF242230);
-    final compact = _screenScale(context);
-
     return Scaffold(
-      backgroundColor: pageBackground,
+      backgroundColor: _pageBackground,
       body: SafeArea(
         child: BlocBuilder<HomeBloc, HomeState>(
           builder: (context, state) {
@@ -111,56 +138,24 @@ class _HomeViewState extends State<_HomeView> {
                 state.error.isEmpty
                     ? 'Unable to load welcome message'
                     : state.error,
-              HomeStatus.success => state.message,
-              HomeStatus.initial => 'Ready for your next print order',
+              HomeStatus.success =>
+                state.message.isEmpty
+                    ? "What's on your desk today?"
+                    : state.message,
+              HomeStatus.initial => "What's on your desk today?",
             };
 
             return Column(
               children: [
-                Container(
-                  color: Colors.white,
-                  padding: EdgeInsets.fromLTRB(
-                    _r(context, 12),
-                    _r(context, 8),
-                    _r(context, 12),
-                    _r(context, 10),
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () {},
-                        icon: Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: _r(context, 20),
-                        ),
-                        color: accent,
-                      ),
-                      Expanded(
-                        child: Text(
-                          'PrintHub',
-                          style: TextStyle(
-                            fontSize: _r(context, 20),
-                            fontWeight: FontWeight.w700,
-                            color: accent,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: _isLoggingOut ? null : _logout,
-                        icon: Icon(Icons.logout_rounded, size: _r(context, 22)),
-                        color: accent,
-                        tooltip: 'Logout',
-                      ),
-                    ],
-                  ),
-                ),
+                // TODO: wire notificationCount to real notification data.
+                const PrintHubAppBar(notificationCount: 0),
                 if (state.status == HomeStatus.loading)
                   const LinearProgressIndicator(minHeight: 2),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(
                       _r(context, 18),
-                      _r(context, 18),
+                      _r(context, 16),
                       _r(context, 18),
                       _r(context, 16),
                     ),
@@ -168,108 +163,55 @@ class _HomeViewState extends State<_HomeView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'OVERVIEW',
+                          'Hi, ${_greetingName().capitalizeFirst()} 👋',
                           style: TextStyle(
-                            fontSize: _r(context, 18),
-                            fontWeight: FontWeight.w300,
-                            letterSpacing: 1.1,
-                            color: Color(0xFF494652),
-                          ),
-                        ),
-                        SizedBox(height: _r(context, 4)),
-                        Text(
-                          'Hi, ${_greetingName().capitalizeFirst()}👋',
-                          style: TextStyle(
-                            fontSize: _r(context, 24),
-                            fontWeight: FontWeight.w700,
-                            color: primaryText,
+                            fontSize: _r(context, 28),
+                            fontWeight: FontWeight.w800,
+                            color: _primaryText,
                             height: 1.05,
                           ),
                         ),
-                        SizedBox(height: _r(context, 4)),
+                        SizedBox(height: _r(context, 6)),
                         Text(
                           greetingSubtitle,
                           style: TextStyle(
                             color: state.status == HomeStatus.failure
                                 ? Colors.red.shade600
-                                : mutedText,
-                            fontSize: _r(context, 12),
+                                : _mutedText,
+                            fontSize: _r(context, 15),
                           ),
                         ),
-                        SizedBox(height: _r(context, 16)),
+                        SizedBox(height: _r(context, 18)),
                         const _PriorityCard(),
-                        SizedBox(height: _r(context, 20)),
-                        Text(
-                          'Print Categories',
-                          style: TextStyle(
-                            fontSize: _r(context, 25),
-                            fontWeight: FontWeight.w700,
-                            color: primaryText,
-                          ),
+                        SizedBox(height: _r(context, 22)),
+                        _SectionHeader(
+                          title: 'OUR SERVICES',
+                          onViewAll: _openUploadDocuments,
                         ),
                         SizedBox(height: _r(context, 12)),
                         _ServicesGrid(
                           categories: state.categories,
                           onPrintTap: _openUploadDocuments,
                         ),
-                        SizedBox(height: _r(context, 18)),
-                        GestureDetector(
-                          onTap: _openUploadDocuments,
-                          child: Container(
-                            width: double.infinity,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: _r(context, 14),
-                              vertical: _r(context, 22),
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(
-                                _r(context, 24),
-                              ),
-                              border: Border.all(
-                                color: const Color(0xFFCBC4DD),
-                                style: BorderStyle.solid,
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: _r(context, 60),
-                                  height: _r(context, 60),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFFE3DAFB),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.cloud_upload_rounded,
-                                    color: accent,
-                                    size: _r(context, 30),
-                                  ),
-                                ),
-                                SizedBox(height: _r(context, 14)),
-                                Text(
-                                  'Upload Document',
-                                  style: TextStyle(
-                                    fontSize: _r(context, 17),
-                                    fontWeight: FontWeight.w700,
-                                    color: primaryText,
-                                  ),
-                                ),
-                                SizedBox(height: _r(context, 8)),
-                                Text(
-                                  'PDF, DOCX or Images up to 50MB',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: _r(context, 13),
-                                    color: Color(0xFF646074),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        SizedBox(height: _r(context, 22)),
+                        _SectionHeader(
+                          title: _activeJobs.length > 1
+                              ? 'ACTIVE JOBS'
+                              : 'ACTIVE JOB',
+                          onViewAll: () {},
                         ),
-                        SizedBox(height: _r(context, 16)),
+                        SizedBox(height: _r(context, 12)),
+                        if (_activeJobs.isEmpty)
+                          const _NoActiveJobs()
+                        else
+                          for (final job in _activeJobs) ...[
+                            _ActiveJobCard(
+                              job: job,
+                              onTap: () => _openActiveJob(job),
+                            ),
+                            SizedBox(height: _r(context, 12)),
+                          ],
+                        SizedBox(height: _r(context, 8)),
                       ],
                     ),
                   ),
@@ -279,45 +221,125 @@ class _HomeViewState extends State<_HomeView> {
           },
         ),
       ),
-      bottomNavigationBar: Container(
-        color: pageBackground,
-        padding: EdgeInsets.fromLTRB(
-          _r(context, 12),
-          _r(context, 4),
-          _r(context, 12),
-          _r(context, 10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _BottomItem(
-              icon: Icons.home_rounded,
-              label: 'HOME',
-              active: true,
-              compact: compact,
-            ),
-            _BottomItem(
-              icon: Icons.cloud_upload_outlined,
-              label: 'UPLOAD',
-              compact: compact,
-            ),
-            _BottomItem(
-              icon: Icons.description_outlined,
-              label: 'ORDERS',
-              compact: compact,
-            ),
-            _BottomItem(
-              icon: Icons.person_outline,
-              label: 'PROFILE',
-              compact: compact,
-            ),
-          ],
-        ),
+      bottomNavigationBar: _BottomNavBar(onProfile: _openProfileSheet),
+    );
+  }
+
+  void _openProfileSheet() {
+    final store = sl<TemporaryAuthStore>();
+    final name = store.displayName.trim().isEmpty
+        ? 'Alex'
+        : store.displayName.trim();
+    final mobile = store.mobile.trim();
+    final initial = name.isEmpty ? 'A' : name[0].toUpperCase();
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0E2EC),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE8F0FE),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: _accent,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name.capitalizeFirst(),
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                              color: _primaryText,
+                            ),
+                          ),
+                          if (mobile.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              mobile,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: _mutedText,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoggingOut
+                        ? null
+                        : () {
+                            Navigator.of(sheetContext).pop();
+                            _logout();
+                          },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFE53935),
+                      side: const BorderSide(color: Color(0xFFF1C5C5)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(Icons.logout_rounded, size: 20),
+                    label: const Text(
+                      'Log out',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
+// ── Priority delivery banner ─────────────────────────────────────────────────
 class _PriorityCard extends StatelessWidget {
   const _PriorityCard();
 
@@ -370,7 +392,7 @@ class _PriorityCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 12 * compact),
-          Text(
+          const Text(
             '15-minute express\nDelivery',
             style: TextStyle(
               color: Colors.white,
@@ -387,33 +409,61 @@ class _PriorityCard extends StatelessWidget {
               fontSize: 14,
             ),
           ),
-          SizedBox(height: 12 * compact),
-
-          // Row(
-          //   children: [
-          //     PrimaryActionButton(
-          //       label: 'Track Live',
-          //       onPressed: () {},
-          //       expand: false,
-          //       trailingIcon: null,
-          //       height: 44 * compact,
-          //       fontSize: 14 * compact,
-          //       borderRadius: 20,
-          //     ),
-          //     const Spacer(),
-          //     Icon(
-          //       Icons.bolt_rounded,
-          //       color: Colors.white.withValues(alpha: 0.2),
-          //       size: 62 * compact,
-          //     ),
-          //   ],
-          // ),
         ],
       ),
     );
   }
 }
 
+// ── Section header with "View all" ───────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.onViewAll});
+
+  final String title;
+  final VoidCallback onViewAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: _r(context, 14),
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.8,
+            color: _primaryText,
+          ),
+        ),
+        GestureDetector(
+          onTap: onViewAll,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'View all',
+                style: TextStyle(
+                  fontSize: _r(context, 13),
+                  fontWeight: FontWeight.w700,
+                  color: _accent,
+                ),
+              ),
+              SizedBox(width: _r(context, 4)),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: _r(context, 15),
+                color: _accent,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Services grid ────────────────────────────────────────────────────────────
 class _ServicesGrid extends StatelessWidget {
   const _ServicesGrid({required this.categories, required this.onPrintTap});
 
@@ -426,7 +476,7 @@ class _ServicesGrid extends StatelessWidget {
     if (categories.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: EdgeInsets.all(10 * compact),
+        padding: EdgeInsets.all(16 * compact),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20 * compact),
@@ -442,21 +492,31 @@ class _ServicesGrid extends StatelessWidget {
       );
     }
 
+    // Display services in a fixed sequence: B&W → Color → Binding → Posters.
+    final ordered = [...categories]
+      ..sort(
+        (a, b) => _categorySortOrder(
+          a.printType,
+        ).compareTo(_categorySortOrder(b.printType)),
+      );
+
     return GridView.count(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
       crossAxisCount: 2,
-      mainAxisSpacing: 15 * compact,
-      crossAxisSpacing: 15 * compact,
-      childAspectRatio: 1.8,
-      children: List.generate(categories.length, (index) {
-        final category = categories[index];
+      mainAxisSpacing: 14 * compact,
+      crossAxisSpacing: 14 * compact,
+      childAspectRatio: 1.1,
+      children: List.generate(ordered.length, (index) {
+        final category = ordered[index];
         return _ServiceTile(
           category: category,
-          icon: _resolveCategoryIcon(category.printType),
-          background: _resolveTileColor(index),
-          titleColor: _resolveTitleColor(index),
-          subtitleColor: _resolveSubtitleColor(index),
+          title: _resolveCategoryTitle(category.printType),
+          svgAsset: _resolveCategorySvg(category.printType),
+          fallbackIcon: _resolveCategoryIcon(category.printType),
+          description: _resolveCategoryDescription(category.printType),
+          iconBackground: _iconBackgroundForIndex(index),
+          iconColor: _iconColorForIndex(index),
           onTap: () => onPrintTap(category),
         );
       }),
@@ -467,116 +527,248 @@ class _ServicesGrid extends StatelessWidget {
 class _ServiceTile extends StatelessWidget {
   const _ServiceTile({
     required this.category,
-    required this.icon,
-    required this.background,
-    required this.titleColor,
-    required this.subtitleColor,
+    required this.title,
+    required this.svgAsset,
+    required this.fallbackIcon,
+    required this.description,
+    required this.iconBackground,
+    required this.iconColor,
     this.onTap,
   });
 
   final PrintCategoryEntity category;
-  final IconData icon;
-  final Color background;
-  final Color titleColor;
-  final Color subtitleColor;
+  final String title;
+  final String? svgAsset;
+  final IconData fallbackIcon;
+  final String description;
+  final Color iconBackground;
+  final Color iconColor;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final compact = 1.0; //_screenScale(context);
-    return SizedBox(
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(24),
-        elevation: 6,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: onTap,
-          child: Padding(
-            padding: EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    // Container(
-                    //   width: 50,
-                    //   height: 50,
-                    //   decoration: BoxDecoration(
-                    //     color: background.computeLuminance() < 0.4
-                    //         ? const Color.fromARGB(
-                    //             255,
-                    //             177,
-                    //             191,
-                    //             216,
-                    //           ).withValues(
-                    //             alpha: 0.15,
-                    //           ) // light overlay for dark bg
-                    //         : Colors.black.withValues(alpha: 0.05),
-                    //     // dark overlay for light bg
-                    //     shape: BoxShape.circle,
-                    //   ),
-                    //   child: ClipOval(
-                    //     child: _AvatarIcon(
-                    //       avatarUrl: category.avatar,
-                    //       fallbackIcon: icon,
-                    //       iconColor: const Color.fromARGB(255, 113, 89, 169),
-                    //       compact: compact,
-                    //     ),
-                    //   ),
-                    // ),
+    final compact = _screenScale(context);
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20 * compact),
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20 * compact),
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.all(14 * compact),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (svgAsset != null)
+                    SvgPicture.asset(
+                      svgAsset!,
+                      width: 44 * compact,
+                      height: 44 * compact,
+                    )
+                  else
                     Container(
-                      width: 50 * compact,
-                      height: 50 * compact,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE4DDF8),
-                        shape: BoxShape.circle,
+                      width: 44 * compact,
+                      height: 44 * compact,
+                      decoration: BoxDecoration(
+                        color: iconBackground,
+                        borderRadius: BorderRadius.circular(12 * compact),
                       ),
                       child: _AvatarIcon(
                         avatarUrl: category.avatar,
-                        fallbackIcon: icon,
-                        iconColor: const Color.fromARGB(255, 113, 89, 169),
+                        fallbackIcon: fallbackIcon,
+                        iconColor: iconColor,
                         compact: compact,
                       ),
                     ),
+                  const Spacer(),
+                  Container(
+                    width: 26 * compact,
+                    height: 26 * compact,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF1F3F8),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18 * compact,
+                      color: const Color(0xFF8B8B9C),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 12 * compact),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _primaryText,
+                  fontSize: 16 * compact,
+                  fontWeight: FontWeight.w800,
+                  height: 1.1,
+                ),
+              ),
+              SizedBox(height: 4 * compact),
+              Text(
+                '₹${category.rate} / page',
+                style: TextStyle(
+                  color: _accent,
+                  fontSize: 14 * compact,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              SizedBox(height: 4 * compact),
+              Text(
+                description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: _mutedText,
+                  fontSize: 11.5 * compact,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                    SizedBox(width: 12 * compact),
-                    Expanded(
-                      child: Text(
-                        category.printType.capitalizeFirst(),
-                        style: TextStyle(
-                          color: titleColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                //  const Spacer(),
-                SizedBox(height: 6 * compact),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10.0),
-                      child: Text(
-                        '₹ ${category.rate}',
-                        style: TextStyle(
-                          color: subtitleColor,
-                          fontSize: 12 * compact,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+// ── Active job card ──────────────────────────────────────────────────────────
+class _NoActiveJobs extends StatelessWidget {
+  const _NoActiveJobs();
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: 16 * compact,
+        vertical: 22 * compact,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * compact),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: 34 * compact,
+            color: const Color(0xFFB4AEC6),
+          ),
+          SizedBox(height: 8 * compact),
+          Text(
+            'No active jobs yet',
+            style: TextStyle(
+              color: _primaryText,
+              fontSize: 14 * compact,
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          SizedBox(height: 2 * compact),
+          Text(
+            'Start a print order and it will show up here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: _mutedText, fontSize: 12 * compact),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActiveJobCard extends StatelessWidget {
+  const _ActiveJobCard({required this.job, required this.onTap});
+
+  final ActiveJob job;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    final extra = job.fileCount > 1 ? '  +${job.fileCount - 1} more' : '';
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20 * compact),
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20 * compact),
+        child: Padding(
+          padding: EdgeInsets.all(16 * compact),
+          child: Row(
+            children: [
+              Container(
+                width: 48 * compact,
+                height: 48 * compact,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0FE),
+                  borderRadius: BorderRadius.circular(12 * compact),
+                ),
+                child: Icon(
+                  Icons.description_outlined,
+                  color: _accent,
+                  size: 26 * compact,
+                ),
+              ),
+              SizedBox(width: 12 * compact),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${job.title}$extra',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _primaryText,
+                        fontSize: 15 * compact,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 6 * compact),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8 * compact,
+                          height: 8 * compact,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF59E0B),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: 8 * compact),
+                        Text(
+                          job.status,
+                          style: TextStyle(
+                            color: _mutedText,
+                            fontSize: 12.5 * compact,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8 * compact),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: const Color(0xFF8A8599),
+                size: 24 * compact,
+              ),
+            ],
           ),
         ),
       ),
@@ -610,20 +802,45 @@ class _AvatarIcon extends StatelessWidget {
       return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
     }
 
-    return Image.network(
-      avatarUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
-      },
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) {
-          return child;
-        }
-        return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
-      },
+    return Padding(
+      padding: EdgeInsets.all(10 * compact),
+      child: Image.network(
+        avatarUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
+        },
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+          return Icon(fallbackIcon, color: iconColor, size: 22 * compact);
+        },
+      ),
     );
   }
+}
+
+/// Returns the bundled SVG icon for a category, or null when none matches
+/// (e.g. lamination), in which case a Material icon fallback is used.
+String? _resolveCategorySvg(String printType) {
+  final normalized = printType.toLowerCase();
+  if (normalized.contains('color')) {
+    return 'assets/decorations/color_icon.svg';
+  }
+  if (normalized.contains('binding')) {
+    return 'assets/decorations/binding_icon.svg';
+  }
+  if (normalized.contains('lamination')) {
+    return 'assets/decorations/binding_icon.svg';
+  }
+  if (normalized.contains('jambo') || normalized.contains('poster')) {
+    return 'assets/decorations/jambo_icon.svg';
+  }
+  if (normalized.contains('black') || normalized.contains('b&w')) {
+    return 'assets/decorations/b&w_icon.svg';
+  }
+  return null;
 }
 
 IconData _resolveCategoryIcon(String printType) {
@@ -631,46 +848,133 @@ IconData _resolveCategoryIcon(String printType) {
   if (normalized.contains('color')) {
     return Icons.palette_outlined;
   }
+  if (normalized.contains('binding')) {
+    return Icons.menu_book_outlined;
+  }
   if (normalized.contains('lamination')) {
     return Icons.layers_outlined;
   }
   if (normalized.contains('jambo') || normalized.contains('poster')) {
-    return Icons.view_agenda_outlined;
+    return Icons.image_outlined;
   }
-  if (normalized.contains('black and white')) {
-    return Icons.print_outlined;
+  if (normalized.contains('black') || normalized.contains('b&w')) {
+    return Icons.description_outlined;
   }
   return Icons.description_outlined;
 }
 
-Color _resolveTileColor(int index) {
+/// Display sequence for the services grid: B&W → Color → Binding → Posters,
+/// then lamination, then anything else (in backend order).
+int _categorySortOrder(String printType) {
+  final normalized = printType.toLowerCase();
+  if (normalized.contains('black') || normalized.contains('b&w')) return 0;
+  if (normalized.contains('color')) return 1;
+  if (normalized.contains('binding')) return 2;
+  if (normalized.contains('jambo') || normalized.contains('poster')) return 3;
+  if (normalized.contains('lamination')) return 4;
+  return 5;
+}
+
+/// Title shown on the service tile. Black & white categories are shortened to
+/// "B&W"; everything else uses its capitalized name.
+String _resolveCategoryTitle(String printType) {
+  final normalized = printType.toLowerCase();
+  if (normalized.contains('black') || normalized.contains('b&w')) {
+    return 'B&W';
+  }
+  return printType.capitalizeFirst();
+}
+
+String _resolveCategoryDescription(String printType) {
+  final normalized = printType.toLowerCase();
+  if (normalized.contains('color')) {
+    return 'Vibrant and high quality color prints';
+  }
+  if (normalized.contains('binding')) {
+    return 'Spiral, comb, thermal & more';
+  }
+  if (normalized.contains('lamination')) {
+    return 'Protective glossy & matte finish';
+  }
+  if (normalized.contains('jambo') || normalized.contains('poster')) {
+    return 'High quality posters in any size';
+  }
+  if (normalized.contains('black') || normalized.contains('b&w')) {
+    return 'High quality black & white prints';
+  }
+  return 'High quality printing service';
+}
+
+Color _iconBackgroundForIndex(int index) {
   const palette = <Color>[
-    Color(0xFFFFFFFF),
-    Color(0xFFFFFFFF),
-    Color(0xFFFFFFFF),
-    Color(0xFFFFFFFF),
+    Color(0xFFE8F0FE), // blue
+    Color(0xFFDFF6F4), // teal
+    Color(0xFFEFE9FD), // purple
+    Color(0xFFFDEEE2), // orange
   ];
   return palette[index % palette.length];
 }
 
-Color _resolveTitleColor(int index) {
+Color _iconColorForIndex(int index) {
   const palette = <Color>[
-    Color.fromARGB(255, 55, 52, 66),
-    Color.fromARGB(255, 55, 52, 66),
-    Color.fromARGB(255, 55, 52, 66),
-    Color.fromARGB(255, 55, 52, 66),
+    Color(0xFF2563EB), // blue
+    Color(0xFF0FB6A6), // teal
+    Color(0xFF7C3AED), // purple
+    Color(0xFFF97316), // orange
   ];
   return palette[index % palette.length];
 }
 
-Color _resolveSubtitleColor(int index) {
-  const palette = <Color>[
-    Color(0xFF4A4657),
-    Color(0xFF4A4657),
-    Color(0xFF4F4A5D),
-    Color(0xFF4E495A),
-  ];
-  return palette[index % palette.length];
+// ── Bottom navigation ────────────────────────────────────────────────────────
+class _BottomNavBar extends StatelessWidget {
+  const _BottomNavBar({required this.onProfile});
+
+  final VoidCallback onProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 12,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.fromLTRB(
+        12 * compact,
+        8 * compact,
+        12 * compact,
+        10 * compact,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _BottomItem(
+            icon: Icons.home_rounded,
+            label: 'Home',
+            active: true,
+            compact: compact,
+          ),
+          _BottomItem(
+            icon: Icons.assignment_outlined,
+            label: 'Orders',
+            compact: compact,
+          ),
+          _BottomItem(
+            icon: Icons.person_outline,
+            label: 'Profile',
+            compact: compact,
+            onTap: onProfile,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _BottomItem extends StatelessWidget {
@@ -679,44 +983,56 @@ class _BottomItem extends StatelessWidget {
     required this.label,
     required this.compact,
     this.active = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final double compact;
   final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = const Color(0xFF6436E0);
-    final inactiveColor = const Color(0xFF99A0B5);
+    const activeColor = _accent;
+    const inactiveColor = Color(0xFF99A0B5);
 
-    return Container(
-      width: 80 * compact,
-      height: 56 * compact,
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFFE8E2FA) : Colors.transparent,
-        borderRadius: BorderRadius.circular(24 * compact),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 20 * compact,
-            color: active ? activeColor : inactiveColor,
-          ),
-          SizedBox(height: 3 * compact),
-          Text(
-            label,
-            style: TextStyle(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12 * compact),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 6 * compact),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 24 * compact,
               color: active ? activeColor : inactiveColor,
-              fontSize: 10.5 * compact,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.1,
             ),
-          ),
-        ],
+            SizedBox(height: 4 * compact),
+            Text(
+              label,
+              style: TextStyle(
+                color: active ? activeColor : inactiveColor,
+                fontSize: 11 * compact,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 4 * compact),
+            if (active)
+              Container(
+                width: 18 * compact,
+                height: 3 * compact,
+                decoration: BoxDecoration(
+                  color: activeColor,
+                  borderRadius: BorderRadius.circular(2 * compact),
+                ),
+              )
+            else
+              SizedBox(height: 3 * compact),
+          ],
+        ),
       ),
     );
   }

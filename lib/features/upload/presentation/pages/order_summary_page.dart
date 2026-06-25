@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../data/datasources/order_remote_data_source.dart';
 import '../../data/models/order_summary_model.dart';
 
@@ -15,20 +17,31 @@ double _r(BuildContext context, double value) => value * _screenScale(context);
 
 String _money(num value) => 'Rs. ${value.toStringAsFixed(2)}';
 
-/// Checkout screen shown after "Proceed to CheckOut". It loads the pending
-/// products for [orderId] from `GET order/order-summary` and renders the
-/// per-item rates/totals returned by the backend (the same rates exposed by
-/// `print-type/get` on the home screen) plus the order totals.
+const _accent = Color(0xFF2563EB);
+const _primaryText = Color(0xFF1B1B2F);
+const _mutedText = Color(0xFF6E6A7C);
+const _success = Color(0xFF1B9E54);
+const _danger = Color(0xFFD93025);
+const _gstRate = 0.18;
+
+/// Demo promo codes applied entirely on the client. The discount is a fraction
+/// of the subtotal. The backend does not yet support promos, so this is
+/// front-end-only until a coupons API exists.
+const _promoCodes = <String, double>{
+  'PROMO20': 0.20,
+  'SAVE10': 0.10,
+  'FIRST15': 0.15,
+};
+
+/// Checkout screen shown after "Next Step". It loads the pending products for
+/// [orderId] from `GET order/order-summary` and renders the print
+/// configuration, offers, billing breakdown and delivery destination.
 class OrderSummaryPage extends StatefulWidget {
-  const OrderSummaryPage({
-    super.key,
-    required this.orderId,
-    this.deliveryAddress,
-  });
+  const OrderSummaryPage({super.key, required this.orderId, this.deliveryAddress});
 
   final String orderId;
 
-  /// Address label to show in the delivery bar, when one was selected.
+  /// Address label to show in the delivery destination, when one was selected.
   final String? deliveryAddress;
 
   @override
@@ -56,54 +69,17 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFFF5F2FA);
-    const accent = Color(0xFF4525CD);
+    const bg = Color(0xFFF6F8FC);
 
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.fromLTRB(
-                _r(context, 12),
-                _r(context, 8),
-                _r(context, 12),
-                _r(context, 10),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: _r(context, 20),
-                    ),
-                    color: accent,
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'Checkout',
-                        style: TextStyle(
-                          fontSize: _r(context, 19),
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1F1F2E),
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(
-                      Icons.notifications_none_rounded,
-                      size: _r(context, 22),
-                    ),
-                    color: accent,
-                  ),
-                ],
-              ),
+            const PrintHubAppBar(
+              title: 'Checkout',
+              showBack: true,
+              centerTitle: true,
             ),
             Expanded(
               child: FutureBuilder<OrderSummaryResponse>(
@@ -141,15 +117,60 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
   }
 }
 
-class _SummaryContent extends StatelessWidget {
+class _SummaryContent extends StatefulWidget {
   const _SummaryContent({required this.summary, required this.deliveryAddress});
 
   final OrderSummaryResponse summary;
   final String? deliveryAddress;
 
   @override
+  State<_SummaryContent> createState() => _SummaryContentState();
+}
+
+class _SummaryContentState extends State<_SummaryContent> {
+  final TextEditingController _promoController = TextEditingController();
+  String? _appliedCode;
+  double _appliedRate = 0;
+
+  @override
+  void dispose() {
+    _promoController.dispose();
+    super.dispose();
+  }
+
+  void _applyPromo() {
+    final code = _promoController.text.trim().toUpperCase();
+    final rate = _promoCodes[code];
+    if (code.isEmpty) return;
+    if (rate == null) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('Invalid promo code.')));
+      return;
+    }
+    setState(() {
+      _appliedCode = code;
+      _appliedRate = rate;
+    });
+    FocusScope.of(context).unfocus();
+  }
+
+  void _removePromo() {
+    setState(() {
+      _appliedCode = null;
+      _appliedRate = 0;
+      _promoController.clear();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const accent = Color(0xFF4525CD);
+    final summary = widget.summary;
+    final subtotal = summary.totalAmount.toDouble();
+    final gst = subtotal * _gstRate;
+    final delivery = summary.deliveryCharge.toDouble();
+    final discount = subtotal * _appliedRate;
+    final amountToPay = subtotal + gst + delivery - discount;
 
     return Column(
       children: [
@@ -164,45 +185,83 @@ class _SummaryContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'CONFIRM ORDER',
-                  style: TextStyle(
-                    fontSize: _r(context, 12),
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
-                    color: accent,
-                  ),
-                ),
-                SizedBox(height: _r(context, 4)),
-                Text(
-                  'Order Summary',
-                  style: TextStyle(
-                    fontSize: _r(context, 30),
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1A1726),
-                  ),
-                ),
-                SizedBox(height: _r(context, 16)),
+                const _SectionLabel('PRINT CONFIGURATION'),
+                SizedBox(height: _r(context, 10)),
                 for (final item in summary.items) ...[
-                  _ItemCard(item: item),
-                  SizedBox(height: _r(context, 14)),
+                  _ConfigCard(item: item),
+                  SizedBox(height: _r(context, 12)),
                 ],
-                SizedBox(height: _r(context, 4)),
-                _PriceBreakdown(summary: summary),
-                SizedBox(height: _r(context, 14)),
-                _DeliveryBar(address: deliveryAddress),
+                SizedBox(height: _r(context, 8)),
+                const _SectionLabel('OFFERS & DISCOUNTS'),
+                SizedBox(height: _r(context, 10)),
+                _PromoField(
+                  controller: _promoController,
+                  appliedCode: _appliedCode,
+                  onApply: _applyPromo,
+                  onRemove: _removePromo,
+                ),
+                SizedBox(height: _r(context, 20)),
+                const _SectionLabel('BILLING BREAKDOWN'),
+                SizedBox(height: _r(context, 10)),
+                _BillingCard(
+                  subtotal: subtotal,
+                  gst: gst,
+                  delivery: delivery,
+                  discount: discount,
+                  appliedCode: _appliedCode,
+                  amountToPay: amountToPay,
+                ),
+                SizedBox(height: _r(context, 20)),
+                Row(
+                  children: [
+                    const _SectionLabel('DELIVERY DESTINATION'),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: Text(
+                        'Change',
+                        style: TextStyle(
+                          color: _accent,
+                          fontSize: _r(context, 14),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: _r(context, 10)),
+                _DestinationCard(address: widget.deliveryAddress),
               ],
             ),
           ),
         ),
-        _PaymentBar(total: summary.grandTotal),
+        _PaymentBar(total: amountToPay),
       ],
     );
   }
 }
 
-class _ItemCard extends StatelessWidget {
-  const _ItemCard({required this.item});
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: _r(context, 12.5),
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.8,
+        color: _mutedText,
+      ),
+    );
+  }
+}
+
+class _ConfigCard extends StatelessWidget {
+  const _ConfigCard({required this.item});
 
   final OrderSummaryItem item;
 
@@ -210,29 +269,35 @@ class _ItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final compact = _screenScale(context);
     final details = item.details;
-    final copyLabel = details.numberOfCopy == 1 ? 'Copy' : 'Copies';
+    final copyLabel = details.numberOfCopy == 1 ? 'COPY' : 'COPIES';
+    final descParts = <String>[
+      if (details.printType.isNotEmpty)
+        '${_capitalize(details.printType)} Printing',
+      '${details.numberOfCopy} ${details.numberOfCopy == 1 ? 'copy' : 'copies'}',
+    ];
 
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(14 * compact),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24 * compact),
+        borderRadius: BorderRadius.circular(18 * compact),
+        border: Border.all(color: const Color(0xFFE6E8F0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 64 * compact,
-            height: 64 * compact,
+            width: 56 * compact,
+            height: 56 * compact,
             decoration: BoxDecoration(
-              color: const Color(0xFF1F2A3B),
+              color: const Color(0xFFE8F0FE),
               borderRadius: BorderRadius.circular(14 * compact),
             ),
             child: Icon(
               Icons.description_outlined,
-              color: Colors.white70,
-              size: 30 * compact,
+              color: _accent,
+              size: 28 * compact,
             ),
           ),
           SizedBox(width: 12 * compact),
@@ -245,51 +310,41 @@ class _ItemCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 17 * compact,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF20202E),
+                    fontSize: 16 * compact,
+                    fontWeight: FontWeight.w800,
+                    color: _primaryText,
                   ),
                 ),
                 SizedBox(height: 4 * compact),
                 Text(
-                  '${details.numberOfCopy} $copyLabel  •  ${_money(item.rate)}/copy',
+                  descParts.join(' • '),
                   style: TextStyle(
                     fontSize: 12.5 * compact,
-                    color: const Color(0xFF6E6A7C),
-                    fontWeight: FontWeight.w500,
+                    color: _mutedText,
+                    height: 1.3,
                   ),
                 ),
                 SizedBox(height: 8 * compact),
-                if (details.printType.isNotEmpty)
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 10 * compact,
-                      vertical: 4 * compact,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE4DDF8),
-                      borderRadius: BorderRadius.circular(10 * compact),
-                    ),
-                    child: Text(
-                      details.printType.toUpperCase(),
-                      style: TextStyle(
-                        color: const Color(0xFF4A23CC),
-                        fontSize: 10.5 * compact,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                      ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10 * compact,
+                    vertical: 4 * compact,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDFF1F0),
+                    borderRadius: BorderRadius.circular(8 * compact),
+                  ),
+                  child: Text(
+                    '${details.numberOfCopy} $copyLabel',
+                    style: TextStyle(
+                      color: const Color(0xFF0F766E),
+                      fontSize: 10.5 * compact,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
                     ),
                   ),
+                ),
               ],
-            ),
-          ),
-          SizedBox(width: 8 * compact),
-          Text(
-            _money(item.total),
-            style: TextStyle(
-              fontSize: 17 * compact,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF1A1726),
             ),
           ),
         ],
@@ -298,10 +353,131 @@ class _ItemCard extends StatelessWidget {
   }
 }
 
-class _PriceBreakdown extends StatelessWidget {
-  const _PriceBreakdown({required this.summary});
+class _PromoField extends StatelessWidget {
+  const _PromoField({
+    required this.controller,
+    required this.appliedCode,
+    required this.onApply,
+    required this.onRemove,
+  });
 
-  final OrderSummaryResponse summary;
+  final TextEditingController controller;
+  final String? appliedCode;
+  final VoidCallback onApply;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                ],
+                decoration: InputDecoration(
+                  hintText: 'Enter Promo Code',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16 * compact,
+                    vertical: 16 * compact,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14 * compact),
+                    borderSide: const BorderSide(color: Color(0xFFE6E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14 * compact),
+                    borderSide: const BorderSide(color: _accent, width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: 10 * compact),
+            SizedBox(
+              height: 52 * compact,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F766E),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14 * compact),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 22 * compact),
+                ),
+                onPressed: onApply,
+                child: Text(
+                  'Apply',
+                  style: TextStyle(
+                    fontSize: 15 * compact,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (appliedCode != null) ...[
+          SizedBox(height: 10 * compact),
+          Row(
+            children: [
+              Icon(
+                Icons.check_circle_rounded,
+                color: _success,
+                size: 18 * compact,
+              ),
+              SizedBox(width: 6 * compact),
+              Text(
+                '$appliedCode APPLIED',
+                style: TextStyle(
+                  color: _success,
+                  fontSize: 13 * compact,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onRemove,
+                child: Text(
+                  'Remove',
+                  style: TextStyle(
+                    color: _danger,
+                    fontSize: 13 * compact,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _BillingCard extends StatelessWidget {
+  const _BillingCard({
+    required this.subtotal,
+    required this.gst,
+    required this.delivery,
+    required this.discount,
+    required this.appliedCode,
+    required this.amountToPay,
+  });
+
+  final double subtotal;
+  final double gst;
+  final double delivery;
+  final double discount;
+  final String? appliedCode;
+  final double amountToPay;
 
   @override
   Widget build(BuildContext context) {
@@ -310,25 +486,34 @@ class _PriceBreakdown extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(16 * compact),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDE8F6),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20 * compact),
+        border: Border.all(color: const Color(0xFFE6E8F0)),
       ),
       child: Column(
         children: [
-          _PriceRow(label: 'Subtotal', value: _money(summary.totalAmount)),
+          _PriceRow(label: 'Subtotal', value: _money(subtotal)),
+          SizedBox(height: 10 * compact),
+          _PriceRow(label: 'GST (18%)', value: _money(gst)),
           SizedBox(height: 10 * compact),
           _PriceRow(
             label: 'Delivery Fee',
-            value: summary.deliveryCharge == 0
-                ? 'FREE'
-                : _money(summary.deliveryCharge),
-            valueColor: summary.deliveryCharge == 0
-                ? const Color(0xFF1A56DD)
-                : null,
+            value: delivery == 0 ? 'FREE' : _money(delivery),
+            valueColor: delivery == 0 ? _accent : null,
           ),
+          if (discount > 0) ...[
+            SizedBox(height: 10 * compact),
+            _PriceRow(
+              label: 'Discount',
+              labelChip: appliedCode,
+              labelColor: _success,
+              value: '-${_money(discount)}',
+              valueColor: _success,
+            ),
+          ],
           Padding(
             padding: EdgeInsets.symmetric(vertical: 12 * compact),
-            child: Divider(height: 1, color: const Color(0xFFCFC7E0)),
+            child: const Divider(height: 1, color: Color(0xFFE6E8F0)),
           ),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -337,24 +522,36 @@ class _PriceBreakdown extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'GRAND TOTAL',
+                    'Amount to Pay',
                     style: TextStyle(
-                      color: const Color(0xFF4525CD),
-                      fontSize: 11 * compact,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.5,
+                      fontSize: 14 * compact,
+                      fontWeight: FontWeight.w700,
+                      color: _primaryText,
                     ),
                   ),
                   SizedBox(height: 2 * compact),
                   Text(
-                    _money(summary.grandTotal),
+                    _money(amountToPay),
                     style: TextStyle(
-                      fontSize: 28 * compact,
+                      fontSize: 26 * compact,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFF1A1726),
+                      color: _accent,
                     ),
                   ),
                 ],
+              ),
+              const Spacer(),
+              SizedBox(
+                width: 120 * compact,
+                child: Text(
+                  'Includes all applicable taxes and handling charges.',
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontSize: 11 * compact,
+                    color: _mutedText,
+                    height: 1.3,
+                  ),
+                ),
               ),
             ],
           ),
@@ -365,11 +562,19 @@ class _PriceBreakdown extends StatelessWidget {
 }
 
 class _PriceRow extends StatelessWidget {
-  const _PriceRow({required this.label, required this.value, this.valueColor});
+  const _PriceRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.labelColor,
+    this.labelChip,
+  });
 
   final String label;
   final String value;
   final Color? valueColor;
+  final Color? labelColor;
+  final String? labelChip;
 
   @override
   Widget build(BuildContext context) {
@@ -380,9 +585,31 @@ class _PriceRow extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 15 * compact,
-            color: const Color(0xFF54505F),
+            color: labelColor ?? const Color(0xFF54505F),
+            fontWeight: labelColor != null ? FontWeight.w700 : FontWeight.w400,
           ),
         ),
+        if (labelChip != null) ...[
+          SizedBox(width: 8 * compact),
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: 8 * compact,
+              vertical: 2 * compact,
+            ),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD7F5E3),
+              borderRadius: BorderRadius.circular(6 * compact),
+            ),
+            child: Text(
+              labelChip!,
+              style: TextStyle(
+                fontSize: 10 * compact,
+                fontWeight: FontWeight.w800,
+                color: _success,
+              ),
+            ),
+          ),
+        ],
         const Spacer(),
         Text(
           value,
@@ -397,26 +624,25 @@ class _PriceRow extends StatelessWidget {
   }
 }
 
-class _DeliveryBar extends StatelessWidget {
-  const _DeliveryBar({required this.address});
+class _DestinationCard extends StatelessWidget {
+  const _DestinationCard({required this.address});
 
   final String? address;
 
   @override
   Widget build(BuildContext context) {
     final compact = _screenScale(context);
-    final label = (address == null || address!.isEmpty)
-        ? 'Add a delivery address'
-        : address!;
+    final hasAddress = address != null && address!.isNotEmpty;
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(12 * compact),
+      padding: EdgeInsets.all(14 * compact),
       decoration: BoxDecoration(
-        color: const Color(0xFFE7E2F1),
+        color: const Color(0xFFEEF1FB),
         borderRadius: BorderRadius.circular(18 * compact),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 40 * compact,
@@ -426,8 +652,8 @@ class _DeliveryBar extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.local_shipping_outlined,
-              color: const Color(0xFF4525CD),
+              Icons.location_on_outlined,
+              color: _accent,
               size: 22 * compact,
             ),
           ),
@@ -437,32 +663,24 @@ class _DeliveryBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'DELIVERING TO',
+                  hasAddress ? 'Delivery Address' : 'No address selected',
                   style: TextStyle(
-                    fontSize: 10 * compact,
+                    fontSize: 15 * compact,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
-                    color: const Color(0xFF6E6A7C),
+                    color: _primaryText,
                   ),
                 ),
-                SizedBox(height: 2 * compact),
+                SizedBox(height: 4 * compact),
                 Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  hasAddress ? address! : 'Go back to choose a delivery address.',
                   style: TextStyle(
-                    fontSize: 13.5 * compact,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF272434),
+                    fontSize: 13 * compact,
+                    color: const Color(0xFF4F4C5D),
+                    height: 1.35,
                   ),
                 ),
               ],
             ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: const Color(0xFF8A8599),
-            size: 24 * compact,
           ),
         ],
       ),
@@ -493,7 +711,7 @@ class _PaymentBar extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30 * compact),
             gradient: const LinearGradient(
-              colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
+              colors: [Color(0xFF2563EB), Color(0xFF1248E7)],
             ),
           ),
           child: Material(
@@ -511,7 +729,7 @@ class _PaymentBar extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Proceed to Payment',
+                    'Pay ${_money(total)}',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 17 * compact,
@@ -532,6 +750,11 @@ class _PaymentBar extends StatelessWidget {
       ),
     );
   }
+}
+
+String _capitalize(String s) {
+  if (s.isEmpty) return s;
+  return s[0].toUpperCase() + s.substring(1).toLowerCase();
 }
 
 class _ErrorView extends StatelessWidget {
@@ -561,9 +784,7 @@ class _ErrorView extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF4A23CC),
-              ),
+              style: FilledButton.styleFrom(backgroundColor: _accent),
               onPressed: onRetry,
               child: const Text('Try Again'),
             ),
@@ -585,11 +806,7 @@ class _EmptyView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.inbox_outlined,
-              size: 48,
-              color: Color(0xFFB4AEC6),
-            ),
+            Icon(Icons.inbox_outlined, size: 48, color: Color(0xFFB4AEC6)),
             SizedBox(height: 12),
             Text(
               'No pending products in this order.',

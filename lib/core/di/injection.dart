@@ -35,6 +35,7 @@ import '../../features/home/domain/usecases/get_welcome_message.dart';
 import '../../features/home/presentation/bloc/home_bloc.dart';
 import '../network/dio_client.dart';
 import '../network/network_info.dart';
+import '../storage/active_job_store.dart';
 import '../storage/temporary_auth_store.dart';
 
 final sl = GetIt.instance;
@@ -60,6 +61,10 @@ Future<void> initDependencies() async {
 
   sl.registerLazySingleton<TemporaryAuthStore>(
     () => TemporaryAuthStore(preferences: sl<SharedPreferences>()),
+  );
+
+  sl.registerLazySingleton<ActiveJobStore>(
+    () => ActiveJobStore(preferences: sl<SharedPreferences>()),
   );
 
   sl.registerLazySingleton<DioClient>(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../delivery/presentation/pages/delivery_address_page.dart';
+import '../../../../core/widgets/printhub_app_bar.dart';
+import '../../../delivery/presentation/pages/order_review_page.dart';
 import '../../domain/entities/print_order_data.dart';
 
 double _screenScale(BuildContext context) {
@@ -104,7 +105,7 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
     }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => DeliveryAddressPage(initialOrder: _order),
+        builder: (_) => OrderReviewPage(initialOrder: _order),
       ),
     );
   }
@@ -119,46 +120,12 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              color: Colors.white,
-              padding: EdgeInsets.fromLTRB(
-                _r(context, 12),
-                _r(context, 8),
-                _r(context, 12),
-                _r(context, 10),
-              ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(
-                      context,
-                    ).pop(widget.saveOnlyMode ? _order : null),
-                    icon: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: _r(context, 20),
-                    ),
-                    color: accent,
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Configure Print',
-                      style: TextStyle(
-                        fontSize: _r(context, 19),
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1F1F2E),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(
-                      Icons.notifications_none_rounded,
-                      size: _r(context, 22),
-                    ),
-                    color: const Color(0xFF1E2433),
-                  ),
-                ],
-              ),
+            PrintHubAppBar(
+              title: 'Configure Print',
+              showBack: true,
+              onBack: () => Navigator.of(
+                context,
+              ).pop(widget.saveOnlyMode ? _order : null),
             ),
             Expanded(
               child: SingleChildScrollView(
