@@ -21,6 +21,10 @@ class _AuthPageState extends State<AuthPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The mobile-number dialog opens the keyboard over this screen. Without
+      // this, the Scaffold shrinks and the fixed-height background Column (which
+      // ends in a Spacer) overflows. The dialog handles its own keyboard insets.
+      resizeToAvoidBottomInset: false,
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state.nextStep == AuthNextStep.enterMobile) {
