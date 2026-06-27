@@ -9,6 +9,8 @@ import '../../../../core/storage/temporary_auth_store.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../auth/domain/usecases/sign_out.dart';
 import '../../domain/entities/print_category_entity.dart';
+import '../../../delivery/presentation/pages/order_review_page.dart'
+    show OrderReviewPage;
 import '../../../upload/presentation/pages/order_summary_page.dart'
     show OrderSummaryPage;
 import '../../../upload/presentation/pages/upload_documents_page.dart'
@@ -72,6 +74,9 @@ class _HomeViewState extends State<_HomeView> {
         builder: (_) => UploadDocumentsPage(
           categoryName: category?.printType,
           categoryRate: category?.rate,
+          printConfigId: category?.id,
+          paperQualities: category?.paperQualities,
+          paperSizes: category?.sizes,
         ),
       ),
     );
@@ -80,13 +85,12 @@ class _HomeViewState extends State<_HomeView> {
   }
 
   Future<void> _openActiveJob(ActiveJob job) async {
+    // Resume the job at the step it was left on.
+    final Widget destination = job.step == ActiveJobStep.checkout
+        ? OrderSummaryPage(orderId: job.orderId, deliveryAddress: job.address)
+        : OrderReviewPage(orderId: job.orderId);
     await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => OrderSummaryPage(
-          orderId: job.orderId,
-          deliveryAddress: job.address,
-        ),
-      ),
+      MaterialPageRoute<void>(builder: (_) => destination),
     );
     if (!mounted) return;
     _loadActiveJobs();
@@ -831,7 +835,8 @@ String? _resolveCategorySvg(String printType) {
   if (normalized.contains('binding')) {
     return 'assets/decorations/binding_icon.svg';
   }
-  if (normalized.contains('lamination')) {
+  // "Photo Print" shares the lamination tile per product mapping.
+  if (normalized.contains('lamination') || normalized.contains('photo')) {
     return 'assets/decorations/binding_icon.svg';
   }
   if (normalized.contains('jambo') || normalized.contains('poster')) {
@@ -851,7 +856,7 @@ IconData _resolveCategoryIcon(String printType) {
   if (normalized.contains('binding')) {
     return Icons.menu_book_outlined;
   }
-  if (normalized.contains('lamination')) {
+  if (normalized.contains('lamination') || normalized.contains('photo')) {
     return Icons.layers_outlined;
   }
   if (normalized.contains('jambo') || normalized.contains('poster')) {
@@ -871,7 +876,9 @@ int _categorySortOrder(String printType) {
   if (normalized.contains('color')) return 1;
   if (normalized.contains('binding')) return 2;
   if (normalized.contains('jambo') || normalized.contains('poster')) return 3;
-  if (normalized.contains('lamination')) return 4;
+  if (normalized.contains('lamination') || normalized.contains('photo')) {
+    return 4;
+  }
   return 5;
 }
 
@@ -892,6 +899,9 @@ String _resolveCategoryDescription(String printType) {
   }
   if (normalized.contains('binding')) {
     return 'Spiral, comb, thermal & more';
+  }
+  if (normalized.contains('photo')) {
+    return 'Glossy & premium photo prints';
   }
   if (normalized.contains('lamination')) {
     return 'Protective glossy & matte finish';

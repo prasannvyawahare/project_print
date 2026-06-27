@@ -40,7 +40,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
   @override
   Future<PrintCategoriesResponseModel> getPrintCategories() async {
     try {
-      final response = await _dioClient.get(path: ApiConstants.printTypePath);
+      final response = await _dioClient.get(path: ApiConstants.printConfigPath);
       final data = response.data as Map<String, dynamic>?;
       return PrintCategoriesResponseModel.fromJson(data ?? <String, dynamic>{});
     } on DioException catch (error) {

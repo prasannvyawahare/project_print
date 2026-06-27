@@ -2,31 +2,47 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// A print order the user has started and taken to checkout. Persisted locally
-/// so it can be surfaced as an "Active Job" on the home screen and reopened at
-/// the checkout step. (The backend has no "list my orders" endpoint yet.)
+/// The step a job is currently parked at, so it can be resumed on the right
+/// screen from the home "Active Jobs" list.
+class ActiveJobStep {
+  const ActiveJobStep._();
+
+  /// Configured + order created, waiting on the Review & Deliver screen.
+  static const String review = 'review';
+
+  /// Delivery chosen, sitting on the Checkout screen.
+  static const String checkout = 'checkout';
+}
+
+/// A print order the user has started. Persisted locally (the backend has no
+/// "list my orders" endpoint yet) so it can be surfaced as an "Active Job" on
+/// the home screen and resumed at the step it was left on — even offline.
 class ActiveJob {
   const ActiveJob({
     required this.orderId,
-    required this.title,
-    required this.fileCount,
+    required this.fileNames,
+    required this.step,
     required this.status,
     required this.createdAtMs,
     this.address,
   });
 
   final String orderId;
-  final String title;
-  final int fileCount;
+  final List<String> fileNames;
+  final String step;
   final String status;
   final String? address;
   final int createdAtMs;
 
-  ActiveJob copyWith({String? status, String? address}) {
+  String get title => fileNames.isNotEmpty ? fileNames.first : 'Print order';
+
+  int get fileCount => fileNames.isEmpty ? 1 : fileNames.length;
+
+  ActiveJob copyWith({String? step, String? status, String? address}) {
     return ActiveJob(
       orderId: orderId,
-      title: title,
-      fileCount: fileCount,
+      fileNames: fileNames,
+      step: step ?? this.step,
       status: status ?? this.status,
       address: address ?? this.address,
       createdAtMs: createdAtMs,
@@ -35,21 +51,26 @@ class ActiveJob {
 
   Map<String, dynamic> toJson() => {
     'orderId': orderId,
-    'title': title,
-    'fileCount': fileCount,
+    'fileNames': fileNames,
+    'step': step,
     'status': status,
     'address': address,
     'createdAtMs': createdAtMs,
   };
 
-  factory ActiveJob.fromJson(Map<String, dynamic> json) => ActiveJob(
-    orderId: json['orderId']?.toString() ?? '',
-    title: json['title']?.toString() ?? 'Print order',
-    fileCount: (json['fileCount'] as num?)?.toInt() ?? 1,
-    status: json['status']?.toString() ?? 'Awaiting payment',
-    address: json['address']?.toString(),
-    createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
-  );
+  factory ActiveJob.fromJson(Map<String, dynamic> json) {
+    final rawNames = json['fileNames'];
+    return ActiveJob(
+      orderId: json['orderId']?.toString() ?? '',
+      fileNames: rawNames is List
+          ? rawNames.map((e) => e.toString()).toList(growable: false)
+          : const <String>[],
+      step: json['step']?.toString() ?? ActiveJobStep.review,
+      status: json['status']?.toString() ?? 'Pending delivery details',
+      address: json['address']?.toString(),
+      createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 class ActiveJobStore {
@@ -79,12 +100,34 @@ class ActiveJobStore {
     }
   }
 
+  ActiveJob? findById(String orderId) {
+    for (final job in getJobs()) {
+      if (job.orderId == orderId) return job;
+    }
+    return null;
+  }
+
   /// Insert or update a job, keyed by [ActiveJob.orderId].
   Future<void> upsert(ActiveJob job) async {
     final jobs = getJobs().toList()
       ..removeWhere((j) => j.orderId == job.orderId)
       ..add(job);
     await _save(jobs);
+  }
+
+  /// Advance an existing job to a new [step] (and optionally [status]/[address]),
+  /// preserving its file list. No-op if the job is not found.
+  Future<void> markStep(
+    String orderId, {
+    required String step,
+    String? status,
+    String? address,
+  }) async {
+    final existing = findById(orderId);
+    if (existing == null) return;
+    await upsert(
+      existing.copyWith(step: step, status: status, address: address),
+    );
   }
 
   Future<void> remove(String orderId) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../delivery/presentation/pages/order_review_page.dart';
+import '../../data/models/print_config_model.dart';
 import '../../domain/entities/print_order_data.dart';
 
 double _screenScale(BuildContext context) {
@@ -20,6 +21,9 @@ class ConfigurePrintPage extends StatefulWidget {
     this.saveOnlyMode = false,
     this.categoryName,
     this.categoryRate,
+    this.printConfigId,
+    this.paperQualities,
+    this.paperSizes,
   });
 
   final PrintOrderData initialOrder;
@@ -31,6 +35,16 @@ class ConfigurePrintPage extends StatefulWidget {
   /// Per-page rate for the selected category, as returned by the backend.
   final num? categoryRate;
 
+  /// `_id` of the selected print config (from `print-config/get`), used to
+  /// match the right config and sent to `order/create`.
+  final String? printConfigId;
+
+  /// Paper qualities/sizes for the selected category, sourced from the
+  /// `print-config/get` data already loaded on the home screen. Used directly to
+  /// populate the dropdowns — this screen makes no network call of its own.
+  final List<PaperQualityOption>? paperQualities;
+  final List<PaperSizeOption>? paperSizes;
+
   @override
   State<ConfigurePrintPage> createState() => _ConfigurePrintPageState();
 }
@@ -40,12 +54,50 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
   late final TextEditingController _fromController;
   late final TextEditingController _toController;
 
+  /// Paper sizes/qualities for the selected print category, passed in from the
+  /// home screen's `print-config/get` data. No network call is made here.
+  late final List<PaperSizeOption> _sizes;
+  late final List<PaperQualityOption> _qualities;
+
   @override
   void initState() {
     super.initState();
     _order = widget.initialOrder;
     _fromController = TextEditingController(text: _order.pageFrom.toString());
     _toController = TextEditingController(text: _order.pageTo.toString());
+    _initFromConfig();
+  }
+
+  /// Populates the dropdowns from the values handed down by the home screen and
+  /// resolves the selected quality/size (keeping the saved selection when it
+  /// still exists, otherwise defaulting to the first option) so the matching
+  /// ids are ready to send to `order/create`.
+  void _initFromConfig() {
+    _sizes = widget.paperSizes ?? const [];
+    _qualities = widget.paperQualities ?? const [];
+
+    final quality = _qualities.firstWhere(
+      (q) => q.name == _order.paperQuality,
+      orElse: () => _qualities.isEmpty
+          ? const PaperQualityOption(id: '', name: '', gsm: '', extra: 0)
+          : _qualities.first,
+    );
+    final size = _sizes.firstWhere(
+      (s) => s.name == _order.paperSize,
+      orElse: () => _sizes.isEmpty
+          ? const PaperSizeOption(id: '', name: '', width: 0, height: 0, extra: 0)
+          : _sizes.first,
+    );
+
+    _order = _order.copyWith(
+      printConfigId: widget.printConfigId?.trim().isNotEmpty == true
+          ? widget.printConfigId!.trim()
+          : _order.printConfigId,
+      paperQuality: _qualities.isEmpty ? _order.paperQuality : quality.name,
+      paperQualityId: quality.id,
+      paperSize: _sizes.isEmpty ? _order.paperSize : size.name,
+      sizeId: size.id,
+    );
   }
 
   @override
@@ -78,23 +130,6 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
 
     _fromController.text = _order.pageFrom.toString();
     _toController.text = _order.pageTo.toString();
-  }
-
-  bool get _hasCategoryRate =>
-      widget.categoryRate != null && widget.categoryRate! > 0;
-
-  int get _selectedPages {
-    final pages = _order.pageTo - _order.pageFrom + 1;
-    return pages < 1 ? 1 : pages;
-  }
-
-  /// Live total based on the selected category rate (pages × copies × rate).
-  /// Falls back to the order's estimate when no category rate was passed.
-  double get _liveTotal {
-    if (!_hasCategoryRate) {
-      return _order.estimatedTotalUsd;
-    }
-    return _selectedPages * _order.copies * widget.categoryRate!.toDouble();
   }
 
   void _proceedToDelivery() {
@@ -187,82 +222,82 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                       ),
                     ),
                     SizedBox(height: _r(context, 10)),
-                    _SectionCard(
-                      title: 'COLOR MODE',
-                      child: _ToggleRow(
-                        leftLabel: 'COLOR',
-                        rightLabel: 'B&W',
-                        leftSelected: _order.colorMode == PrintColorMode.color,
-                        onLeftTap: () => _updateOrder(
-                          _order.copyWith(colorMode: PrintColorMode.color),
-                        ),
-                        onRightTap: () => _updateOrder(
-                          _order.copyWith(colorMode: PrintColorMode.blackWhite),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: _r(context, 10)),
-                    _SectionCard(
-                      title: 'PRINT OPTION',
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _OptionChip(
-                            label: 'Color',
-                            selected:
-                                _order.printOption == PrintServiceOption.color,
-                            onTap: () => _updateOrder(
-                              _order.copyWith(
-                                printOption: PrintServiceOption.color,
-                              ),
-                            ),
-                          ),
-                          _OptionChip(
-                            label: 'B&W',
-                            selected:
-                                _order.printOption ==
-                                PrintServiceOption.blackWhite,
-                            onTap: () => _updateOrder(
-                              _order.copyWith(
-                                printOption: PrintServiceOption.blackWhite,
-                              ),
-                            ),
-                          ),
-                          _OptionChip(
-                            label: 'Banner',
-                            selected:
-                                _order.printOption == PrintServiceOption.banner,
-                            onTap: () => _updateOrder(
-                              _order.copyWith(
-                                printOption: PrintServiceOption.banner,
-                              ),
-                            ),
-                          ),
-                          _OptionChip(
-                            label: 'Spiral',
-                            selected:
-                                _order.printOption == PrintServiceOption.spiral,
-                            onTap: () => _updateOrder(
-                              _order.copyWith(
-                                printOption: PrintServiceOption.spiral,
-                              ),
-                            ),
-                          ),
-                          _OptionChip(
-                            label: 'Other',
-                            selected:
-                                _order.printOption == PrintServiceOption.other,
-                            onTap: () => _updateOrder(
-                              _order.copyWith(
-                                printOption: PrintServiceOption.other,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: _r(context, 10)),
+                    // _SectionCard(
+                    //   title: 'COLOR MODE',
+                    //   child: _ToggleRow(
+                    //     leftLabel: 'COLOR',
+                    //     rightLabel: 'B&W',
+                    //     leftSelected: _order.colorMode == PrintColorMode.color,
+                    //     onLeftTap: () => _updateOrder(
+                    //       _order.copyWith(colorMode: PrintColorMode.color),
+                    //     ),
+                    //     onRightTap: () => _updateOrder(
+                    //       _order.copyWith(colorMode: PrintColorMode.blackWhite),
+                    //     ),
+                    //   ),
+                    // ),
+                    // SizedBox(height: _r(context, 10)),
+                    // _SectionCard(
+                    //   title: 'PRINT OPTION',
+                    //   child: Wrap(
+                    //     spacing: 8,
+                    //     runSpacing: 8,
+                    //     children: [
+                    //       _OptionChip(
+                    //         label: 'Color',
+                    //         selected:
+                    //             _order.printOption == PrintServiceOption.color,
+                    //         onTap: () => _updateOrder(
+                    //           _order.copyWith(
+                    //             printOption: PrintServiceOption.color,
+                    //           ),
+                    //         ),
+                    //       ),
+                    //       _OptionChip(
+                    //         label: 'B&W',
+                    //         selected:
+                    //             _order.printOption ==
+                    //             PrintServiceOption.blackWhite,
+                    //         onTap: () => _updateOrder(
+                    //           _order.copyWith(
+                    //             printOption: PrintServiceOption.blackWhite,
+                    //           ),
+                    //         ),
+                    //       ),
+                    //       _OptionChip(
+                    //         label: 'Banner',
+                    //         selected:
+                    //             _order.printOption == PrintServiceOption.banner,
+                    //         onTap: () => _updateOrder(
+                    //           _order.copyWith(
+                    //             printOption: PrintServiceOption.banner,
+                    //           ),
+                    //         ),
+                    //       ),
+                    //       _OptionChip(
+                    //         label: 'Spiral',
+                    //         selected:
+                    //             _order.printOption == PrintServiceOption.spiral,
+                    //         onTap: () => _updateOrder(
+                    //           _order.copyWith(
+                    //             printOption: PrintServiceOption.spiral,
+                    //           ),
+                    //         ),
+                    //       ),
+                    //       _OptionChip(
+                    //         label: 'Other',
+                    //         selected:
+                    //             _order.printOption == PrintServiceOption.other,
+                    //         onTap: () => _updateOrder(
+                    //           _order.copyWith(
+                    //             printOption: PrintServiceOption.other,
+                    //           ),
+                    //         ),
+                    //       ),
+                    //     ],
+                    //   ),
+                    // ),
+                    // SizedBox(height: _r(context, 10)),
                     _SectionCard(
                       title: 'PAGE RANGE',
                       trailing: Text(
@@ -324,46 +359,69 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                     ),
                     SizedBox(height: _r(context, 10)),
                     _SectionCard(
-                      title: 'PAPER SIZE',
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF0EBF8),
-                          borderRadius: BorderRadius.circular(_r(context, 10)),
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: _r(context, 10),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _order.paperSize,
-                            isExpanded: true,
-                            icon: const Icon(Icons.expand_more_rounded),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'A4 (Standard)',
-                                child: Text('A4 (Standard)'),
-                              ),
-                              DropdownMenuItem(value: 'A3', child: Text('A3')),
-                              DropdownMenuItem(
-                                value: 'Letter',
-                                child: Text('Letter'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              if (value == null) return;
-                              _updateOrder(_order.copyWith(paperSize: value));
-                            },
-                          ),
-                        ),
+                      title: 'PAPER QUALITY',
+                      child: _ConfigDropdown(
+                        value:
+                            _qualities.any(
+                              (q) => q.name == _order.paperQuality,
+                            )
+                            ? _order.paperQuality
+                            : null,
+                        hint: 'No paper quality available',
+                        items: [
+                          for (final quality in _qualities)
+                            DropdownMenuItem(
+                              value: quality.name,
+                              child: Text(quality.label),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          final option = _qualities.firstWhere(
+                            (q) => q.name == value,
+                          );
+                          _updateOrder(
+                            _order.copyWith(
+                              paperQuality: option.name,
+                              paperQualityId: option.id,
+                            ),
+                          );
+                        },
                       ),
                     ),
                     SizedBox(height: _r(context, 10)),
-                    _TotalCard(
-                      total: _liveTotal,
-                      currencySymbol: _hasCategoryRate ? 'Rs. ' : '\$',
-                      currencyCode: _hasCategoryRate ? 'INR' : 'USD',
+                    _SectionCard(
+                      title: 'PAPER SIZE',
+                      child: _ConfigDropdown(
+                        value: _sizes.any((s) => s.name == _order.paperSize)
+                            ? _order.paperSize
+                            : null,
+                        hint: 'No paper size available',
+                        items: [
+                          for (final size in _sizes)
+                            DropdownMenuItem(
+                              value: size.name,
+                              child: Text(size.label),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          final option = _sizes.firstWhere(
+                            (s) => s.name == value,
+                          );
+                          _updateOrder(
+                            _order.copyWith(
+                              paperSize: option.name,
+                              sizeId: option.id,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(height: _r(context, 14)),
+                    _ProceedButton(
                       onTap: _proceedToDelivery,
-                      buttonLabel: widget.saveOnlyMode
+                      label: widget.saveOnlyMode
                           ? 'Save Configuration'
                           : 'Proceed to Delivery',
                     ),
@@ -508,6 +566,43 @@ class _SectionCard extends StatelessWidget {
   }
 }
 
+/// Dropdown styled to match the Configure Print fields, used for the paper
+/// quality and paper size options loaded from `print-config/get`.
+class _ConfigDropdown extends StatelessWidget {
+  const _ConfigDropdown({
+    required this.value,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String? value;
+  final String hint;
+  final List<DropdownMenuItem<String>> items;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0EBF8),
+        borderRadius: BorderRadius.circular(_r(context, 10)),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: _r(context, 10)),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.expand_more_rounded),
+          hint: Text(hint, style: const TextStyle(color: Color(0xFF8B8799))),
+          items: items,
+          onChanged: items.isEmpty ? null : onChanged,
+        ),
+      ),
+    );
+  }
+}
+
 class _RoundButton extends StatelessWidget {
   const _RoundButton({
     required this.icon,
@@ -619,45 +714,6 @@ class _ToggleButton extends StatelessWidget {
   }
 }
 
-class _OptionChip extends StatelessWidget {
-  const _OptionChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final compact = _screenScale(context);
-    return Material(
-      color: selected ? const Color(0xFF4A23CC) : const Color(0xFFE8E2F4),
-      borderRadius: BorderRadius.circular(16 * compact),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16 * compact),
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: 10 * compact,
-            vertical: 8 * compact,
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : const Color(0xFF59566B),
-              fontSize: 12 * compact,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _RangeField extends StatelessWidget {
   const _RangeField({
     required this.controller,
@@ -707,130 +763,51 @@ class _RangeField extends StatelessWidget {
   }
 }
 
-class _TotalCard extends StatelessWidget {
-  const _TotalCard({
-    required this.total,
-    required this.onTap,
-    required this.buttonLabel,
-    this.currencySymbol = '\$',
-    this.currencyCode = 'USD',
-  });
+class _ProceedButton extends StatelessWidget {
+  const _ProceedButton({required this.onTap, required this.label});
 
-  final double total;
   final VoidCallback onTap;
-  final String buttonLabel;
-  final String currencySymbol;
-  final String currencyCode;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final compact = _screenScale(context);
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        14 * compact,
-        14 * compact,
-        14 * compact,
-        14 * compact,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28 * compact),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'ESTIMATED TOTAL',
-                style: TextStyle(
-                  color: Color(0xFF666275),
-                  fontSize: 12 * compact,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 2,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'EARN ${(total * 1).round()} POINTS',
-                style: TextStyle(
-                  color: Color(0xFF1A56DD),
-                  fontSize: 11 * compact,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
+      height: 54 * compact,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(30 * compact),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
           ),
-          SizedBox(height: 4 * compact),
-          Row(
-            children: [
-              Text(
-                '$currencySymbol${total.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 28 * compact,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF4A23CC),
-                ),
-              ),
-              SizedBox(width: 6 * compact),
-              Text(
-                currencyCode,
-                style: TextStyle(
-                  color: Color(0xFF6E6A7F),
-                  fontSize: 12 * compact,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'Includes priority handling',
-                style: TextStyle(
-                  color: Color(0xFF7D788D),
-                  fontSize: 11 * compact,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 10 * compact),
-          SizedBox(
-            width: double.infinity,
-            height: 54 * compact,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30 * compact),
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
-                ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(30 * compact),
-                  onTap: onTap,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        buttonLabel,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16 * compact,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(width: 8 * compact),
-                      Icon(
-                        Icons.arrow_forward_rounded,
-                        color: Colors.white,
-                        size: 20 * compact,
-                      ),
-                    ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(30 * compact),
+            onTap: onTap,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16 * compact,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
+                SizedBox(width: 8 * compact),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  color: Colors.white,
+                  size: 20 * compact,
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

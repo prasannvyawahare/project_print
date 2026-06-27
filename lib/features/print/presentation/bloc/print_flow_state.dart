@@ -40,6 +40,10 @@ class PrintFlowState extends Equatable {
       pageTo: config.pageTo.clamp(1, file.pageCount),
       orientation: config.orientation,
       paperSize: config.paperSize,
+      paperQuality: config.paperQuality,
+      printConfigId: config.printConfigId,
+      paperQualityId: config.paperQualityId,
+      sizeId: config.sizeId,
       printOption: config.printOption,
       deliveryAddressType:
           lastOrder?.deliveryAddressType ?? DeliveryAddressType.home,
@@ -91,6 +95,10 @@ class PrintFlowState extends Equatable {
       pageTo: selectedConfig.pageTo.clamp(1, selectedFile.pageCount),
       orientation: selectedConfig.orientation,
       paperSize: selectedConfig.paperSize,
+      paperQuality: selectedConfig.paperQuality,
+      printConfigId: selectedConfig.printConfigId,
+      paperQualityId: selectedConfig.paperQualityId,
+      sizeId: selectedConfig.sizeId,
       printOption: selectedConfig.printOption,
       deliveryAddressType:
           lastOrder?.deliveryAddressType ?? DeliveryAddressType.home,

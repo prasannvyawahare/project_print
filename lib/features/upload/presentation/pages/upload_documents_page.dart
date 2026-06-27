@@ -7,9 +7,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:open_filex/open_filex.dart';
 
 import '../../../../core/di/injection.dart';
+import '../../../../core/storage/active_job_store.dart';
 import '../../../../core/widgets/primary_action_button.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../delivery/presentation/pages/order_review_page.dart';
+import '../../../print/data/models/print_config_model.dart';
 import '../../../print/domain/entities/print_order_data.dart';
 import '../../../print/presentation/bloc/print_flow_bloc.dart';
 import '../../../print/presentation/bloc/print_flow_event.dart';
@@ -26,14 +28,34 @@ double _screenScale(BuildContext context) {
 
 double _r(BuildContext context, double value) => value * _screenScale(context);
 
+/// Flat delivery charge sent to `order/create` until a delivery-fee UI exists.
+const num _kDeliveryCharge = 20;
+
 class UploadDocumentsPage extends StatefulWidget {
-  const UploadDocumentsPage({super.key, this.categoryName, this.categoryRate});
+  const UploadDocumentsPage({
+    super.key,
+    this.categoryName,
+    this.categoryRate,
+    this.printConfigId,
+    this.paperQualities,
+    this.paperSizes,
+  });
 
   /// Print category selected on the home screen (e.g. "Color A4").
   final String? categoryName;
 
   /// Per-page rate for the selected category, as returned by the backend.
   final num? categoryRate;
+
+  /// `_id` of the selected print config (from `print-config/get`), forwarded to
+  /// the Configure Print screen and sent to `order/create`.
+  final String? printConfigId;
+
+  /// Paper qualities/sizes for the selected category, taken from the
+  /// `print-config/get` data already loaded on the home screen and forwarded to
+  /// Configure Print so it can populate its dropdowns without re-fetching.
+  final List<PaperQualityOption>? paperQualities;
+  final List<PaperSizeOption>? paperSizes;
 
   @override
   State<UploadDocumentsPage> createState() => _UploadDocumentsPageState();
@@ -71,6 +93,9 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
           saveOnlyMode: true,
           categoryName: widget.categoryName,
           categoryRate: widget.categoryRate,
+          printConfigId: widget.printConfigId,
+          paperQualities: widget.paperQualities,
+          paperSizes: widget.paperSizes,
         ),
       ),
     );
@@ -89,6 +114,10 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
           pageTo: updatedOrder.pageTo,
           orientation: updatedOrder.orientation,
           paperSize: updatedOrder.paperSize,
+          paperQuality: updatedOrder.paperQuality,
+          printConfigId: updatedOrder.printConfigId,
+          paperQualityId: updatedOrder.paperQualityId,
+          sizeId: updatedOrder.sizeId,
           printOption: updatedOrder.printOption,
         ),
       ),
@@ -339,13 +368,16 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
     }
 
     final orderItems = _buildOrderItems(state);
+    final printConfigId = _resolvePrintConfigId(state);
 
     setState(() {
       _isCreatingOrder = true;
     });
 
     try {
-      final orderId = await sl<OrderRemoteDataSource>().createOrder(
+      final result = await sl<OrderRemoteDataSource>().createOrder(
+        printConfigId: printConfigId,
+        deliveryCharge: _kDeliveryCharge,
         items: orderItems,
       );
 
@@ -353,10 +385,27 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
         return;
       }
 
+      // Configuration is complete and the order exists — hold it as an active
+      // job so it shows on home and can be resumed at the Review & Deliver step.
+      sl<ActiveJobStore>().upsert(
+        ActiveJob(
+          orderId: result.orderId,
+          fileNames: mergedOrder.documents
+              .map((d) => d.name)
+              .toList(growable: false),
+          step: ActiveJobStep.review,
+          status: 'Pending delivery details',
+          createdAtMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (_) =>
-              OrderReviewPage(initialOrder: mergedOrder, orderId: orderId),
+          builder: (_) => OrderReviewPage(
+            initialOrder: mergedOrder,
+            orderId: result.orderId,
+            createResult: result,
+          ),
         ),
       );
     } on OrderCreateException catch (error) {
@@ -378,14 +427,33 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
   List<OrderCreateItem> _buildOrderItems(PrintFlowState state) {
     return state.files.map((file) {
       final config = state.configurations[file.path] ?? state.configFor(file);
+      final pages = (config.pageTo - config.pageFrom + 1).clamp(
+        1,
+        file.pageCount < 1 ? 1 : file.pageCount,
+      );
       return OrderCreateItem(
         fileName: file.name,
         fileType: _fileTypeFor(file.name),
+        mimeType: _mimeTypeFor(file.name),
+        fileSize: file.sizeInBytes,
+        paperQualityId: config.paperQualityId,
+        sizeId: config.sizeId,
+        numberOfPages: pages,
         numberOfCopy: config.copies,
         samePage: config.pageFrom == config.pageTo,
-        printType: widget.categoryName ?? _printTypeFor(config),
       );
     }).toList();
+  }
+
+  /// Print config id sent at the order level: the home selection when present,
+  /// else whatever a configured file resolved against `print-config/get`.
+  String _resolvePrintConfigId(PrintFlowState state) {
+    final fromHome = widget.printConfigId?.trim() ?? '';
+    if (fromHome.isNotEmpty) return fromHome;
+    for (final config in state.configurations.values) {
+      if (config.printConfigId.isNotEmpty) return config.printConfigId;
+    }
+    return '';
   }
 
   String _fileTypeFor(String fileName) {
@@ -397,20 +465,16 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
     return lower.substring(dotIndex + 1);
   }
 
-  String _printTypeFor(FilePrintConfiguration config) {
-    final paperSize = switch (config.paperSize) {
-      'A4 (Standard)' => 'A4',
-      'A3' => 'A3',
-      'Letter' => 'Letter',
-      _ => config.paperSize,
-    };
-
-    return switch (config.printOption) {
-      PrintServiceOption.color => 'COLOR $paperSize',
-      PrintServiceOption.blackWhite => 'B&W $paperSize',
-      PrintServiceOption.banner => 'BANNER',
-      PrintServiceOption.spiral => 'SPIRAL',
-      PrintServiceOption.other => paperSize,
+  String _mimeTypeFor(String fileName) {
+    return switch (_fileTypeFor(fileName)) {
+      'pdf' => 'application/pdf',
+      'doc' => 'application/msword',
+      'docx' =>
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'application/octet-stream',
     };
   }
 
@@ -658,31 +722,26 @@ class _FileConfigDetails extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Copies: ${config.copies}   '
-            'Color: ${config.colorMode == PrintColorMode.color ? 'Color' : 'B&W'}',
+            'Range: ${config.pageFrom}-${config.pageTo}',
             style: const TextStyle(color: Color(0xFF4B475A), fontSize: 14),
           ),
           const SizedBox(height: 2),
           Text(
-            'Range: ${config.pageFrom}-${config.pageTo}   '
             'Orientation: ${config.orientation == PrintOrientation.portrait ? 'Portrait' : 'Landscape'}',
             style: const TextStyle(color: Color(0xFF4B475A), fontSize: 14),
           ),
           const SizedBox(height: 2),
           Text(
-            'Paper: ${config.paperSize}',
+            'Paper Size: ${config.paperSize}',
             style: const TextStyle(color: Color(0xFF4B475A), fontSize: 14),
           ),
-          const SizedBox(height: 2),
-          Text(
-            'Print Option: ${switch (config.printOption) {
-              PrintServiceOption.color => 'Color',
-              PrintServiceOption.blackWhite => 'B&W',
-              PrintServiceOption.banner => 'Banner',
-              PrintServiceOption.spiral => 'Spiral',
-              PrintServiceOption.other => 'Other',
-            }}',
-            style: const TextStyle(color: Color(0xFF4B475A), fontSize: 14),
-          ),
+          if (config.paperQuality.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Paper Quality: ${config.paperQuality}',
+              style: const TextStyle(color: Color(0xFF4B475A), fontSize: 14),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [

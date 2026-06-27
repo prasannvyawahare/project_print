@@ -14,9 +14,11 @@ class HomeLocalDataSourceImpl implements HomeLocalDataSource {
   HomeLocalDataSourceImpl({required SharedPreferences preferences})
     : _preferences = preferences;
 
+  // Bumped to v3 so caches written before paper qualities/sizes were persisted
+  // are discarded, forcing a refetch that includes the `options` payload.
   static const String _categoriesPayloadKey =
-      'home_print_categories_payload_v1';
-  static const String _categoriesFetchDayKey = 'home_print_categories_day_v1';
+      'home_print_categories_payload_v3';
+  static const String _categoriesFetchDayKey = 'home_print_categories_day_v3';
 
   final SharedPreferences _preferences;
 

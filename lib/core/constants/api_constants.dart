@@ -7,6 +7,7 @@ class ApiConstants {
   static const String checkStorageExists = 'user/storage-exists';
   static const String createStorage = 'user/create-storage';
   static const String printTypePath = 'print-type/get';
+  static const String printConfigPath = 'print-config/get';
 
   static const String uploadRequestPath = 'upload/request';
   static const String uploadCompletePath = 'upload/complete';

@@ -40,6 +40,10 @@ class PrintOrderData {
     this.pageTo = 1,
     this.orientation = PrintOrientation.portrait,
     this.paperSize = 'A4 (Standard)',
+    this.paperQuality = '',
+    this.printConfigId = '',
+    this.paperQualityId = '',
+    this.sizeId = '',
     this.printOption = PrintServiceOption.color,
     this.deliveryAddressType = DeliveryAddressType.home,
     this.homeAddress = '221B Baker Street, London, NW1 6XE',
@@ -57,6 +61,12 @@ class PrintOrderData {
   final int pageTo;
   final PrintOrientation orientation;
   final String paperSize;
+  final String paperQuality;
+
+  /// IDs sourced from `print-config/get`, sent to `order/create`.
+  final String printConfigId;
+  final String paperQualityId;
+  final String sizeId;
   final PrintServiceOption printOption;
   final DeliveryAddressType deliveryAddressType;
   final String homeAddress;
@@ -83,6 +93,10 @@ class PrintOrderData {
     int? pageTo,
     PrintOrientation? orientation,
     String? paperSize,
+    String? paperQuality,
+    String? printConfigId,
+    String? paperQualityId,
+    String? sizeId,
     PrintServiceOption? printOption,
     DeliveryAddressType? deliveryAddressType,
     String? homeAddress,
@@ -101,6 +115,10 @@ class PrintOrderData {
       pageTo: pageTo ?? this.pageTo,
       orientation: orientation ?? this.orientation,
       paperSize: paperSize ?? this.paperSize,
+      paperQuality: paperQuality ?? this.paperQuality,
+      printConfigId: printConfigId ?? this.printConfigId,
+      paperQualityId: paperQualityId ?? this.paperQualityId,
+      sizeId: sizeId ?? this.sizeId,
       printOption: printOption ?? this.printOption,
       deliveryAddressType: deliveryAddressType ?? this.deliveryAddressType,
       homeAddress: homeAddress ?? this.homeAddress,
@@ -121,6 +139,10 @@ class FilePrintConfiguration {
     required this.pageTo,
     required this.orientation,
     required this.paperSize,
+    this.paperQuality = '',
+    this.printConfigId = '',
+    this.paperQualityId = '',
+    this.sizeId = '',
     required this.printOption,
   });
 
@@ -130,5 +152,9 @@ class FilePrintConfiguration {
   final int pageTo;
   final PrintOrientation orientation;
   final String paperSize;
+  final String paperQuality;
+  final String printConfigId;
+  final String paperQualityId;
+  final String sizeId;
   final PrintServiceOption printOption;
 }

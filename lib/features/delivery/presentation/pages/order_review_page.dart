@@ -4,10 +4,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/storage/active_job_store.dart';
+import '../../../../core/storage/temporary_auth_store.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../print/domain/entities/print_order_data.dart';
+import '../../../upload/data/datasources/drive_upload_data_source.dart';
 import '../../../upload/data/datasources/order_remote_data_source.dart';
 import '../../../upload/data/models/order_summary_model.dart';
+import '../../../upload/presentation/controllers/file_upload_controller.dart';
 import '../../../upload/presentation/pages/order_summary_page.dart';
 import '../../domain/entities/address_entity.dart';
 import '../bloc/address_bloc.dart';
@@ -33,10 +36,22 @@ const _mutedText = Color(0xFF7B778C);
 /// (Formerly `DeliveryAddressPage`. The GPS map and delivery-speed cards were
 /// removed in favour of the simpler queue + address layout.)
 class OrderReviewPage extends StatefulWidget {
-  const OrderReviewPage({super.key, required this.initialOrder, this.orderId});
+  const OrderReviewPage({
+    super.key,
+    this.initialOrder,
+    this.orderId,
+    this.createResult,
+  });
 
-  final PrintOrderData initialOrder;
+  /// The freshly-configured order when arriving from the upload flow. Null when
+  /// the screen is resumed from an active job (the queue then comes from the
+  /// persisted file list / API).
+  final PrintOrderData? initialOrder;
   final String? orderId;
+
+  /// Full `order/create` response (totals + upload sessions), forwarded from the
+  /// upload flow. Null when the screen is resumed from an active job.
+  final OrderCreateResult? createResult;
 
   @override
   State<OrderReviewPage> createState() => _OrderReviewPageState();
@@ -47,18 +62,80 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
   String? _selectedAddressId;
   AddressEntity? _selectedAddress;
   Future<OrderSummaryResponse>? _queueFuture;
+  FileUploadController? _uploadController;
 
   @override
   void initState() {
     super.initState();
     final id = widget.orderId?.trim();
     _orderId = (id == null || id.isEmpty) ? null : id;
+    _startUploads();
+
     final resolvedId = _orderId;
-    if (resolvedId != null) {
+    // Only fetch the order summary when we are NOT uploading (i.e. resumed from a
+    // home active job). During the fresh upload flow the queue is the live
+    // upload progress instead.
+    if (resolvedId != null && _uploadController == null) {
       _queueFuture = sl<OrderRemoteDataSource>().getOrderSummary(
         orderId: resolvedId,
       );
     }
+  }
+
+  /// Builds an upload task per file (mapping each `uploadUrl` from the
+  /// order/create response to its document by position) and kicks them off in
+  /// parallel.
+  void _startUploads() {
+    final result = widget.createResult;
+    if (result == null || result.uploads.isEmpty) return;
+
+    final docs = widget.initialOrder?.documents ?? const <PrintDocument>[];
+    final tasks = <FileUploadTask>[];
+    for (var i = 0; i < result.uploads.length; i++) {
+      final upload = result.uploads[i];
+      final doc = i < docs.length ? docs[i] : null;
+      tasks.add(
+        FileUploadTask(
+          itemId: upload.itemId,
+          uploadSessionId: upload.uploadSessionId,
+          fileName: doc?.name ?? 'File ${i + 1}',
+          filePath: doc?.path ?? '',
+          fileSize: doc?.sizeInBytes ?? 0,
+          sessionUrl: upload.uploadUrl,
+        ),
+      );
+    }
+
+    final controller = FileUploadController(
+      dataSource: sl<DriveUploadDataSource>(),
+      orderDataSource: sl<OrderRemoteDataSource>(),
+      accessToken: sl<TemporaryAuthStore>().token,
+      tasks: tasks,
+    );
+    _uploadController = controller;
+    controller.startAll();
+  }
+
+  @override
+  void dispose() {
+    _uploadController?.dispose();
+    super.dispose();
+  }
+
+  /// File names to show in the queue when the API summary is unavailable
+  /// (offline / resumed job): the freshly-configured order's documents, else
+  /// the persisted active job's file list.
+  List<String> _fallbackFileNames() {
+    final fromOrder = widget.initialOrder?.documents
+        .map((d) => d.name)
+        .toList(growable: false);
+    if (fromOrder != null && fromOrder.isNotEmpty) return fromOrder;
+    final id = _orderId;
+    if (id != null) {
+      final job = sl<ActiveJobStore>().findById(id);
+      if (job != null) return job.fileNames;
+    }
+    return const <String>[];
   }
 
   String _addressLabel(AddressEntity a) {
@@ -70,7 +147,7 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
     return parts.join(', ');
   }
 
-  void _proceedToCheckout() {
+  void _proceedToCheckout(BuildContext blocContext) {
     final orderId = _orderId;
     if (orderId == null || orderId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,28 +166,24 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
       return;
     }
 
+    // Commit the chosen address to the backend before continuing to checkout.
+    blocContext.read<AddressBloc>().add(
+      AddressSelectRequested(addressId: address.id),
+    );
+
     final addressLabel = _addressLabel(address);
-    _recordActiveJob(orderId, addressLabel);
+    // Advance the held active job to the checkout step so resuming lands here.
+    sl<ActiveJobStore>().markStep(
+      orderId,
+      step: ActiveJobStep.checkout,
+      status: 'Awaiting payment',
+      address: addressLabel,
+    );
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
             OrderSummaryPage(orderId: orderId, deliveryAddress: addressLabel),
-      ),
-    );
-  }
-
-  void _recordActiveJob(String orderId, String addressLabel) {
-    final documents = widget.initialOrder.documents;
-    final title = documents.isNotEmpty ? documents.first.name : 'Print order';
-    sl<ActiveJobStore>().upsert(
-      ActiveJob(
-        orderId: orderId,
-        title: title,
-        fileCount: documents.isEmpty ? 1 : documents.length,
-        status: 'Awaiting payment',
-        address: addressLabel,
-        createdAtMs: DateTime.now().millisecondsSinceEpoch,
       ),
     );
   }
@@ -345,10 +418,15 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _QueueSection(
-                            queueFuture: _queueFuture,
-                            fallbackDocuments: widget.initialOrder.documents,
-                          ),
+                          if (_uploadController != null)
+                            _UploadQueueSection(
+                              controller: _uploadController!,
+                            )
+                          else
+                            _QueueSection(
+                              queueFuture: _queueFuture,
+                              fallbackNames: _fallbackFileNames(),
+                            ),
                           SizedBox(height: _r(context, 24)),
                           Row(
                             children: [
@@ -402,15 +480,13 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                                               addr.selected) ||
                                           _selectedAddressId == addr.id,
                                       onTap: () {
+                                        // Selection is local only (shows the
+                                        // flag); the select-address API runs on
+                                        // Next Step.
                                         setState(() {
                                           _selectedAddressId = addr.id;
                                           _selectedAddress = addr;
                                         });
-                                        ctx.read<AddressBloc>().add(
-                                          AddressSelectRequested(
-                                            addressId: addr.id,
-                                          ),
-                                        );
                                       },
                                       onDelete: () {
                                         ctx.read<AddressBloc>().add(
@@ -455,7 +531,7 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(_r(context, 16)),
-                      onTap: _proceedToCheckout,
+                      onTap: () => _proceedToCheckout(ctx),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -487,26 +563,229 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
   }
 }
 
+// ── Upload queue section (live upload progress, reuses the Queue layout) ──────
+class _UploadQueueSection extends StatelessWidget {
+  const _UploadQueueSection({required this.controller});
+
+  final FileUploadController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final tasks = controller.tasks;
+        final subtitle = controller.allSucceeded
+            ? 'All files uploaded'
+            : controller.hasFailures && !controller.isUploading
+            ? 'Some uploads failed'
+            : 'Uploading ${controller.successCount}/${tasks.length}';
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Queue',
+                  style: TextStyle(
+                    fontSize: _r(context, 26),
+                    fontWeight: FontWeight.w800,
+                    color: _primaryText,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: _r(context, 13),
+                    color: controller.hasFailures && !controller.isUploading
+                        ? const Color(0xFFC2410C)
+                        : _mutedText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: _r(context, 12)),
+            for (final task in tasks) ...[
+              _UploadFileCard(
+                task: task,
+                onRetry: () => controller.retry(task),
+              ),
+              SizedBox(height: _r(context, 12)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Mirrors [_QueueFileCard] but reflects live upload state: a horizontal
+/// progress bar while uploading, a status badge when done, and Retry on error.
+class _UploadFileCard extends StatelessWidget {
+  const _UploadFileCard({required this.task, required this.onRetry});
+
+  final FileUploadTask task;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    final isUploading =
+        task.status == FileUploadStatus.uploading ||
+        task.status == FileUploadStatus.pending;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12 * compact),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16 * compact),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44 * compact,
+            height: 44 * compact,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F0FE),
+              borderRadius: BorderRadius.circular(12 * compact),
+            ),
+            child: Icon(
+              _fileIcon(task.fileName),
+              color: _accent,
+              size: 24 * compact,
+            ),
+          ),
+          SizedBox(width: 12 * compact),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15 * compact,
+                    fontWeight: FontWeight.w700,
+                    color: _primaryText,
+                  ),
+                ),
+                SizedBox(height: 8 * compact),
+                if (isUploading)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4 * compact),
+                          child: LinearProgressIndicator(
+                            value: task.progress,
+                            minHeight: 6 * compact,
+                            backgroundColor: const Color(0xFFE8EAF2),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              _accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8 * compact),
+                      Text(
+                        '${(task.progress * 100).toStringAsFixed(0)}%',
+                        style: TextStyle(
+                          fontSize: 12 * compact,
+                          fontWeight: FontWeight.w700,
+                          color: _accent,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  _statusBadge(compact),
+                if (task.status == FileUploadStatus.failed &&
+                    task.error != null) ...[
+                  SizedBox(height: 4 * compact),
+                  Text(
+                    task.error!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11 * compact,
+                      color: const Color(0xFFC2410C),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (task.status == FileUploadStatus.failed)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Retry',
+              onPressed: onRetry,
+              icon: Icon(
+                Icons.refresh_rounded,
+                size: 22 * compact,
+                color: _accent,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBadge(double compact) {
+    final (String label, Color fg, Color bg) =
+        task.status == FileUploadStatus.success
+        ? ('UPLOADED', const Color(0xFF1B9E54), const Color(0xFFD7F5E3))
+        : ('FAILED', const Color(0xFFD93025), const Color(0xFFFADAD7));
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: 8 * compact,
+        vertical: 3 * compact,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6 * compact),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: fg,
+          fontSize: 10 * compact,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
 // ── Queue section ────────────────────────────────────────────────────────────
 class _QueueSection extends StatelessWidget {
-  const _QueueSection({
-    required this.queueFuture,
-    required this.fallbackDocuments,
-  });
+  const _QueueSection({required this.queueFuture, required this.fallbackNames});
 
   final Future<OrderSummaryResponse>? queueFuture;
-  final List<PrintDocument> fallbackDocuments;
+  final List<String> fallbackNames;
+
+  List<_QueueEntry> get _fallbackEntries =>
+      fallbackNames.map((n) => _QueueEntry(name: n)).toList();
 
   @override
   Widget build(BuildContext context) {
     // No order id (e.g. reached straight from configure) — show local files.
     if (queueFuture == null) {
-      return _buildList(
-        context,
-        fallbackDocuments
-            .map((d) => _QueueEntry(name: d.name, fileType: d.name))
-            .toList(),
-      );
+      return _buildList(context, _fallbackEntries);
     }
 
     return FutureBuilder<OrderSummaryResponse>(
@@ -530,17 +809,8 @@ class _QueueSection extends StatelessWidget {
 
         final items = snapshot.data?.items ?? const <OrderSummaryItem>[];
         final entries = items.isEmpty
-            ? fallbackDocuments
-                  .map((d) => _QueueEntry(name: d.name, fileType: d.name))
-                  .toList()
-            : items
-                  .map(
-                    (i) => _QueueEntry(
-                      name: i.details.fileName,
-                      fileType: i.details.fileType,
-                    ),
-                  )
-                  .toList();
+            ? _fallbackEntries
+            : items.map((i) => _QueueEntry(name: i.details.fileName)).toList();
         return _buildList(context, entries);
       },
     );
@@ -602,10 +872,9 @@ class _QueueSection extends StatelessWidget {
 }
 
 class _QueueEntry {
-  const _QueueEntry({required this.name, required this.fileType});
+  const _QueueEntry({required this.name});
 
   final String name;
-  final String fileType;
 }
 
 IconData _fileIcon(String nameOrType) {
@@ -664,7 +933,7 @@ class _QueueFileCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12 * compact),
             ),
             child: Icon(
-              _fileIcon(entry.fileType.isEmpty ? entry.name : entry.fileType),
+              _fileIcon(entry.name),
               color: _accent,
               size: 24 * compact,
             ),

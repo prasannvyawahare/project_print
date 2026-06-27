@@ -25,6 +25,8 @@ import '../../features/delivery/domain/usecases/get_addresses.dart';
 import '../../features/delivery/domain/usecases/remove_address.dart';
 import '../../features/delivery/domain/usecases/select_address.dart';
 import '../../features/delivery/presentation/bloc/address_bloc.dart';
+import '../../features/print/data/datasources/print_config_remote_data_source.dart';
+import '../../features/upload/data/datasources/drive_upload_data_source.dart';
 import '../../features/upload/data/datasources/order_remote_data_source.dart';
 import '../../features/home/data/datasources/home_remote_data_source.dart';
 import '../../features/home/data/datasources/home_local_data_source.dart';
@@ -201,6 +203,17 @@ Future<void> initDependencies() async {
       removeAddress: sl<RemoveAddress>(),
       selectAddress: sl<SelectAddress>(),
     ),
+  );
+
+  sl.registerLazySingleton<PrintConfigRemoteDataSource>(
+    () => PrintConfigRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<DriveUploadDataSource>(
+    () => DriveUploadDataSource(logger: sl<Logger>()),
   );
 
   sl.registerLazySingleton<OrderRemoteDataSource>(
