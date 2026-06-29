@@ -19,6 +19,13 @@ class ApiConstants {
 
   static const String orderCreate = 'order/create';
   static const String orderSummary = 'order/order-summary';
+  static const String orderCheckout = 'order/checkout';
+  static const String orderCancel = 'order/cancel';
+
+  /// Finalizes a single order item after its Drive upload PUT succeeds.
+  /// [itemId] comes from the `order/create` response.
+  static String orderItemUploadComplete(String itemId) =>
+      'order/items/$itemId/upload-complete';
 
   // Keep existing demo endpoint working with an absolute URL.
   static const String welcomePath =

@@ -8,6 +8,7 @@ import '../../../../core/storage/active_job_store.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../auth/domain/usecases/sign_out.dart';
+import '../../../upload/data/datasources/order_remote_data_source.dart';
 import '../../domain/entities/print_category_entity.dart';
 import '../../../delivery/presentation/pages/order_review_page.dart'
     show OrderReviewPage;
@@ -94,6 +95,54 @@ class _HomeViewState extends State<_HomeView> {
     );
     if (!mounted) return;
     _loadActiveJobs();
+  }
+
+  Future<void> _removeActiveJob(ActiveJob job) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel order?'),
+        content: Text(
+          'This removes "${job.title}" from your active jobs and cancels it. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFFD93025)),
+            child: const Text('Cancel order'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await sl<OrderRemoteDataSource>().cancelOrder(orderId: job.orderId);
+      await sl<ActiveJobStore>().remove(job.orderId);
+      if (!mounted) return;
+      _loadActiveJobs();
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('Order cancelled.')));
+    } on OrderCreateException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Failed to cancel the order.')),
+        );
+    }
   }
 
   Future<void> _logout() async {
@@ -212,6 +261,7 @@ class _HomeViewState extends State<_HomeView> {
                             _ActiveJobCard(
                               job: job,
                               onTap: () => _openActiveJob(job),
+                              onRemove: () => _removeActiveJob(job),
                             ),
                             SizedBox(height: _r(context, 12)),
                           ],
@@ -691,10 +741,15 @@ class _NoActiveJobs extends StatelessWidget {
 }
 
 class _ActiveJobCard extends StatelessWidget {
-  const _ActiveJobCard({required this.job, required this.onTap});
+  const _ActiveJobCard({
+    required this.job,
+    required this.onTap,
+    required this.onRemove,
+  });
 
   final ActiveJob job;
   final VoidCallback onTap;
+  final VoidCallback onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -706,12 +761,19 @@ class _ActiveJobCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20 * compact),
       elevation: 3,
       shadowColor: Colors.black.withValues(alpha: 0.08),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20 * compact),
-        child: Padding(
-          padding: EdgeInsets.all(16 * compact),
-          child: Row(
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20 * compact),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16 * compact,
+                16 * compact,
+                16 * compact,
+                16 * compact,
+              ),
+              child: Row(
             children: [
               Container(
                 width: 48 * compact,
@@ -763,18 +825,70 @@ class _ActiveJobCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (job.grandTotal > 0) ...[
+                      SizedBox(height: 6 * compact),
+                      Text(
+                        'Base Rs. ${job.baseRate.toStringAsFixed(0)}'
+                        '  •  Subtotal Rs. ${job.subtotal.toStringAsFixed(0)}'
+                        '  •  Delivery Rs. ${job.deliveryCharge.toStringAsFixed(0)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _mutedText,
+                          fontSize: 11.5 * compact,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               SizedBox(width: 8 * compact),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: const Color(0xFF8A8599),
-                size: 24 * compact,
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (job.grandTotal > 0)
+                    Text(
+                      'Rs. ${job.grandTotal.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        color: _accent,
+                        fontSize: 14 * compact,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: const Color(0xFF8A8599),
+                    size: 24 * compact,
+                  ),
+                ],
               ),
             ],
+              ),
+            ),
           ),
-        ),
+          Positioned(
+            top: 4 * compact,
+            right: 4 * compact,
+            child: Material(
+              color: Colors.transparent,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onRemove,
+                child: Padding(
+                  padding: EdgeInsets.all(6 * compact),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 18 * compact,
+                    color: const Color(0xFF8A8599),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

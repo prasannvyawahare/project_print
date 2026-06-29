@@ -8,10 +8,14 @@ class OnboardingHeroCard extends StatelessWidget {
     super.key,
     required this.height,
     required this.scale,
+    required this.image,
   });
 
   final double height;
   final double scale;
+
+  /// Asset path of the illustration shown inside the front card.
+  final String image;
 
   @override
   Widget build(BuildContext context) {
@@ -51,54 +55,36 @@ class OnboardingHeroCard extends StatelessWidget {
                 ),
               ],
             ),
-            child: Stack(
-              children: [
-                Positioned(
-                  left: AppDimensions.spacing28 * scale,
-                  top: AppDimensions.spacing24 * scale,
-                  child: Container(
-                    height: AppDimensions.spacing16 * scale,
-                    width: AppDimensions.spacing94 * scale,
-                    decoration: BoxDecoration(
-                      color: AppColors.heroChip,
-                      borderRadius: BorderRadius.circular(
-                        AppDimensions.radius20 * scale,
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: AppDimensions.spacing180 * scale,
-                  child: Container(
-                    height: AppDimensions.spacing6 * scale,
-                    decoration: const BoxDecoration(
-                      gradient: AppGradients.heroCenterLine,
-                    ),
-                  ),
-                ),
-              ],
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(
+                AppDimensions.radius54 * scale,
+              ),
+              child: Image.asset(
+                image,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+              ),
             ),
           ),
-          Positioned(
-            right: -AppDimensions.spacing18 * scale,
-            top: AppDimensions.spacing86 * scale,
-            child: _RoundIcon(
-              icon: Icons.cloud_upload_outlined,
-              iconColor: AppColors.heroUploadIcon,
-              scale: scale,
-            ),
-          ),
-          Positioned(
-            left: -AppDimensions.spacing18 * scale,
-            bottom: AppDimensions.spacing78 * scale,
-            child: _RoundIcon(
-              icon: Icons.photo_camera_outlined,
-              iconColor: AppColors.heroCameraIcon,
-              scale: scale,
-            ),
-          ),
+          // Positioned(
+          //   right: -AppDimensions.spacing18 * scale,
+          //   top: AppDimensions.spacing86 * scale,
+          //   child: _RoundIcon(
+          //     icon: Icons.cloud_upload_outlined,
+          //     iconColor: AppColors.heroUploadIcon,
+          //     scale: scale,
+          //   ),
+          // ),
+          // Positioned(
+          // left: -AppDimensions.spacing18 * scale,
+          // bottom: AppDimensions.spacing78 * scale,
+          // child: _RoundIcon(
+          //   icon: Icons.photo_camera_outlined,
+          //   iconColor: AppColors.heroCameraIcon,
+          //   scale: scale,
+          // ),
+          //e),
         ],
       ),
     );

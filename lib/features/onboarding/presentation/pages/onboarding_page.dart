@@ -20,16 +20,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
       title: AppConstants.onboardingTitlePrecision,
       description: AppConstants.onboardingDescriptionPrecision,
       highlight: 'SCAN',
+      image: 'assets/decorations/screen1.png',
     ),
     OnboardingStep(
       title: AppConstants.onboardingTitleProduction,
       description: AppConstants.onboardingDescriptionProduction,
       highlight: 'PRINT',
+      image: 'assets/decorations/screen2.png',
     ),
     OnboardingStep(
       title: AppConstants.onboardingTitleDelivery,
       description: AppConstants.onboardingDescriptionDelivery,
       highlight: 'DELIVER',
+      image: 'assets/decorations/screen3.png',
     ),
   ];
 
@@ -70,8 +73,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
             final scale = (width / AppDimensions.designWidth).clamp(0.82, 1.08);
             final isCompact = height < AppDimensions.compactHeightBreakpoint;
 
-            final titleSize = (AppDimensions.spacing52 * scale)
-                .clamp(AppDimensions.spacing30, AppDimensions.spacing46)
+            final titleSize = (AppDimensions.spacing40 * scale)
+                .clamp(AppDimensions.spacing24, AppDimensions.spacing46)
                 .toDouble();
             final descriptionSize = (AppDimensions.spacing22 * scale)
                 .clamp(AppDimensions.spacing14, AppDimensions.spacing18)
@@ -113,11 +116,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         final step = _steps[index];
                         return Column(
                           children: [
+                            SizedBox(height: AppDimensions.spacing36 * scale),
                             OnboardingHeroCard(
                               height: heroHeight,
                               scale: scale,
+                              image: step.image,
                             ),
-                            SizedBox(height: AppDimensions.spacing12 * scale),
+                            SizedBox(height: AppDimensions.spacing36 * scale),
                             Text(
                               step.title,
                               textAlign: TextAlign.center,

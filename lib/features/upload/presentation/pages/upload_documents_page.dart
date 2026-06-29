@@ -396,6 +396,9 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
           step: ActiveJobStep.review,
           status: 'Pending delivery details',
           createdAtMs: DateTime.now().millisecondsSinceEpoch,
+          baseRate: result.baseRate,
+          subtotal: result.totalAmount,
+          deliveryCharge: result.deliveryCharge,
         ),
       );
 
@@ -495,11 +498,11 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                 title: 'Upload Documents',
                 showBack: true,
                 actions: [
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(Icons.search_rounded, size: _r(context, 22)),
-                    color: const Color(0xFF1E2433),
-                  ),
+                  // IconButton(
+                  //   onPressed: () {},
+                  //   icon: Icon(Icons.search_rounded, size: _r(context, 22)),
+                  //   color: const Color(0xFF1E2433),
+                  // ),
                 ],
               ),
               Expanded(
@@ -527,7 +530,7 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                         RichText(
                           text: TextSpan(
                             style: TextStyle(
-                              fontSize: _r(context, 38),
+                              fontSize: _r(context, 18),
                               height: 1.05,
                               fontWeight: FontWeight.w700,
                               color: titleColor,
@@ -535,10 +538,9 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                             children: const [
                               TextSpan(text: 'Select your '),
                               TextSpan(
-                                text: 'Precision',
+                                text: 'Precision files',
                                 style: TextStyle(color: Color(0xFF1B43D4)),
                               ),
-                              TextSpan(text: '\nfiles.'),
                             ],
                           ),
                         ),
@@ -656,8 +658,8 @@ class _UploadDocumentsPageState extends State<UploadDocumentsPage> {
                             ),
                           ),
                         ),
-                        SizedBox(height: _r(context, 6)),
-                        _AddFileCard(onTap: _showAddOptions),
+                        // SizedBox(height: _r(context, 6)),
+                        // _AddFileCard(onTap: _showAddOptions),
                       ],
                     ),
                   ),

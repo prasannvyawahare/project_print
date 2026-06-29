@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/storage/active_job_store.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
+import '../../../../core/widgets/primary_action_button.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../print/domain/entities/print_order_data.dart';
 import '../../../upload/data/datasources/drive_upload_data_source.dart';
@@ -111,9 +112,33 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
       orderDataSource: sl<OrderRemoteDataSource>(),
       accessToken: sl<TemporaryAuthStore>().token,
       tasks: tasks,
+      onAllUploadsComplete: _fetchSummaryAfterUploads,
     );
     _uploadController = controller;
     controller.startAll();
+  }
+
+  /// Runs `order/order-summary` once every file's `upload/complete` has gone
+  /// through, so the finalized order (and its billing totals) is refreshed.
+  void _fetchSummaryAfterUploads() {
+    final id = _orderId;
+    if (id == null) return;
+    final future = sl<OrderRemoteDataSource>().getOrderSummary(orderId: id);
+    if (mounted) {
+      setState(() => _queueFuture = future);
+    }
+    // Keep the locally-stored active-job billing in sync with the finalized
+    // totals returned by the summary.
+    future
+        .then((summary) {
+          sl<ActiveJobStore>().markStep(
+            id,
+            step: ActiveJobStep.review,
+            subtotal: summary.totalAmount,
+            deliveryCharge: summary.deliveryCharge,
+          );
+        })
+        .catchError((_) {});
   }
 
   @override
@@ -166,11 +191,8 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
       return;
     }
 
-    // Commit the chosen address to the backend before continuing to checkout.
-    blocContext.read<AddressBloc>().add(
-      AddressSelectRequested(addressId: address.id),
-    );
-
+    // The chosen address was already committed to the backend (via the
+    // select-address API) when it was tapped, so we go straight to checkout.
     final addressLabel = _addressLabel(address);
     // Advance the held active job to the checkout step so resuming lands here.
     sl<ActiveJobStore>().markStep(
@@ -182,8 +204,12 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
 
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            OrderSummaryPage(orderId: orderId, deliveryAddress: addressLabel),
+        builder: (_) => OrderSummaryPage(
+          orderId: orderId,
+          deliveryAddress: addressLabel,
+          addressId: address.id,
+          createResult: widget.createResult,
+        ),
       ),
     );
   }
@@ -419,9 +445,7 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           if (_uploadController != null)
-                            _UploadQueueSection(
-                              controller: _uploadController!,
-                            )
+                            _UploadQueueSection(controller: _uploadController!)
                           else
                             _QueueSection(
                               queueFuture: _queueFuture,
@@ -480,13 +504,22 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                                               addr.selected) ||
                                           _selectedAddressId == addr.id,
                                       onTap: () {
-                                        // Selection is local only (shows the
-                                        // flag); the select-address API runs on
-                                        // Next Step.
+                                        if (_selectedAddressId == addr.id) {
+                                          return;
+                                        }
+                                        // Mark as selected locally (shows the
+                                        // "Selected for delivery" badge) and
+                                        // immediately commit it to the backend
+                                        // via the select-address API.
                                         setState(() {
                                           _selectedAddressId = addr.id;
                                           _selectedAddress = addr;
                                         });
+                                        ctx.read<AddressBloc>().add(
+                                          AddressSelectRequested(
+                                            addressId: addr.id,
+                                          ),
+                                        );
                                       },
                                       onDelete: () {
                                         ctx.read<AddressBloc>().add(
@@ -517,43 +550,13 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                 _r(context, 18),
                 _r(context, 14),
               ),
-              child: SizedBox(
-                width: double.infinity,
+              child: PrimaryActionButton(
+                label: 'Next Step',
+                onPressed: () => _proceedToCheckout(ctx),
                 height: _r(context, 56),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(_r(context, 16)),
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF1248E7)],
-                    ),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(_r(context, 16)),
-                      onTap: () => _proceedToCheckout(ctx),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Next Step',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: _r(context, 17),
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          SizedBox(width: _r(context, 10)),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            color: Colors.white,
-                            size: _r(context, 22),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                borderRadius: _r(context, 16),
+                fontSize: _r(context, 17),
+                iconSize: _r(context, 22),
               ),
             ),
           ),
@@ -571,6 +574,9 @@ class _UploadQueueSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const accent = Color(0xFF3E34D3);
+    const pageBackground = Color(0xFFF5F2FA);
+    const titleColor = Color(0xFF1F1F2E);
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -584,17 +590,37 @@ class _UploadQueueSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'STEP 02',
+              style: TextStyle(
+                fontSize: _r(context, 13),
+                fontWeight: FontWeight.w800,
+                letterSpacing: 3,
+                color: accent,
+              ),
+            ),
+            SizedBox(height: _r(context, 10)),
+            RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: _r(context, 18),
+                  height: 1.05,
+                  fontWeight: FontWeight.w700,
+                  color: titleColor,
+                ),
+                children: const [
+                  TextSpan(text: 'Select your '),
+                  TextSpan(
+                    text: 'Address',
+                    style: TextStyle(color: Color(0xFF1B43D4)),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: _r(context, 18)),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  'Queue',
-                  style: TextStyle(
-                    fontSize: _r(context, 26),
-                    fontWeight: FontWeight.w800,
-                    color: _primaryText,
-                  ),
-                ),
                 const Spacer(),
                 Text(
                   subtitle,
@@ -745,8 +771,11 @@ class _UploadFileCard extends StatelessWidget {
   }
 
   Widget _statusBadge(double compact) {
-    final (String label, Color fg, Color bg) =
-        task.status == FileUploadStatus.success
+    final (
+      String label,
+      Color fg,
+      Color bg,
+    ) = task.status == FileUploadStatus.success
         ? ('UPLOADED', const Color(0xFF1B9E54), const Color(0xFFD7F5E3))
         : ('FAILED', const Color(0xFFD93025), const Color(0xFFFADAD7));
     return Container(

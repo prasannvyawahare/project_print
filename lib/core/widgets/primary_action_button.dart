@@ -9,6 +9,9 @@ class PrimaryActionButton extends StatelessWidget {
     this.isLoading = false,
     this.expand = true,
     this.color = kPrimaryActionColor,
+    this.gradient = kPrimaryActionGradient,
+
+    ///PrimaryActionButton
     this.borderRadius = 24,
     this.height = 64,
     this.fontSize = 22,
@@ -30,8 +33,13 @@ class PrimaryActionButton extends StatelessWidget {
   /// Stretches the button to the full available width when true.
   final bool expand;
 
-  /// Background color of the button.
+  /// Background color of the button. Used for the shadow tint and as a
+  /// fallback when [gradient] is null.
   final Color color;
+
+  /// Gradient painted as the button background. Defaults to the priority
+  /// service banner gradient. Pass null to fall back to a solid [color].
+  final Gradient? gradient;
 
   /// Corner radius of the button.
   final double borderRadius;
@@ -45,7 +53,14 @@ class PrimaryActionButton extends StatelessWidget {
   /// Size of the trailing icon.
   final double iconSize;
 
-  static const Color kPrimaryActionColor = Color(0xFFFF6A00);
+  static const Color kPrimaryActionColor = Color(0xFF2563EB);
+
+  /// Same gradient used by the home "priority service" banner.
+  static const Gradient kPrimaryActionGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF4A20C7), Color(0xFF40D9D9)],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +70,8 @@ class PrimaryActionButton extends StatelessWidget {
     final button = DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,
+        gradient: gradient,
+        color: gradient == null ? color : null,
         boxShadow: isEnabled
             ? [
                 BoxShadow(
@@ -65,46 +82,51 @@ class PrimaryActionButton extends StatelessWidget {
               ]
             : null,
       ),
-      child: Material(
-        color: isEnabled ? color : color.withValues(alpha: 0.5),
-        borderRadius: radius,
-        child: InkWell(
+      child: Opacity(
+        opacity: isEnabled ? 1 : 0.5,
+        child: Material(
+          color: Colors.transparent,
           borderRadius: radius,
-          onTap: isEnabled ? onPressed : null,
-          child: SizedBox(
-            height: height,
-            child: Center(
-              child: isLoading
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.6,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          label,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.w700,
+          child: InkWell(
+            borderRadius: radius,
+            onTap: isEnabled ? onPressed : null,
+            child: SizedBox(
+              height: height,
+              child: Center(
+                child: isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.6,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
                           ),
                         ),
-                        if (trailingIcon != null) ...[
-                          const SizedBox(width: 12),
-                          Icon(
-                            trailingIcon,
-                            color: Colors.white,
-                            size: iconSize,
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            label,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: fontSize,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
+                          if (trailingIcon != null) ...[
+                            const SizedBox(width: 12),
+                            Icon(
+                              trailingIcon,
+                              color: Colors.white,
+                              size: iconSize,
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
+              ),
             ),
           ),
         ),

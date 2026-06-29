@@ -16,12 +16,27 @@ abstract class OrderRemoteDataSource {
 
   Future<OrderSummaryResponse> getOrderSummary({required String orderId});
 
+  /// Places the order for [orderId] against [addressId] with the chosen
+  /// [paymentMethod] (e.g. `COD`). Backed by `POST order/checkout`.
+  Future<OrderCheckoutResult> checkout({
+    required String orderId,
+    required String addressId,
+    required String paymentMethod,
+  });
+
+  /// Cancels (deletes) the order [orderId] on the backend via
+  /// `DELETE order/cancel`.
+  Future<void> cancelOrder({required String orderId});
+
   /// Notifies the backend that a file's Drive upload finished, so it can
   /// finalize the item. Called once per file after its `uploadUrl` PUT succeeds.
+  ///
+  /// Backed by `POST order/items/<itemId>/upload-complete`, where [itemId]
+  /// comes from the `order/create` response and [driveFileId] is the `id`
+  /// Drive returned from the resumable PUT (see [DriveUploadResult.id]).
   Future<void> completeUpload({
-    required String uploadSessionId,
-    required String fileName,
-    required int fileSize,
+    required String itemId,
+    required String driveFileId,
   });
 }
 
@@ -161,23 +176,115 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   }
 
   @override
-  Future<void> completeUpload({
-    required String uploadSessionId,
-    required String fileName,
-    required int fileSize,
+  Future<OrderCheckoutResult> checkout({
+    required String orderId,
+    required String addressId,
+    required String paymentMethod,
   }) async {
-    if (uploadSessionId.isEmpty) {
-      throw const OrderCreateException('Missing upload session id.');
+    if (orderId.isEmpty) {
+      throw const OrderCreateException('Missing order ID for checkout.');
+    }
+    if (addressId.isEmpty) {
+      throw const OrderCreateException('Please select a delivery address.');
+    }
+
+    try {
+      final response = await _dioClient.post(
+        path: ApiConstants.orderCheckout,
+        data: {
+          'orderId': orderId,
+          'addressId': addressId,
+          'paymentMethod': paymentMethod,
+        },
+      );
+
+      final responseData = response.data;
+      final responseMap = responseData is Map<String, dynamic>
+          ? responseData
+          : const <String, dynamic>{};
+      final data = responseMap['data'] is Map<String, dynamic>
+          ? responseMap['data'] as Map<String, dynamic>
+          : responseMap;
+
+      return OrderCheckoutResult.fromJson(
+        data,
+        message: responseMap['message']?.toString(),
+      );
+    } on DioException catch (error, stackTrace) {
+      _logger.e('Order checkout failed', error: error, stackTrace: stackTrace);
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to place the order.',
+      );
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Unexpected order checkout error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error is OrderCreateException) {
+        rethrow;
+      }
+      throw const OrderCreateException('Failed to place the order.');
+    }
+  }
+
+  @override
+  Future<void> cancelOrder({required String orderId}) async {
+    if (orderId.isEmpty) {
+      throw const OrderCreateException('Missing order ID to cancel.');
+    }
+
+    try {
+      await _dioClient.delete(
+        path: ApiConstants.orderCancel,
+        data: {'orderId': orderId},
+      );
+    } on DioException catch (error, stackTrace) {
+      _logger.e('Order cancel failed', error: error, stackTrace: stackTrace);
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to cancel the order.',
+      );
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Unexpected order cancel error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error is OrderCreateException) {
+        rethrow;
+      }
+      throw const OrderCreateException('Failed to cancel the order.');
+    }
+  }
+
+  @override
+  Future<void> completeUpload({
+    required String itemId,
+    required String driveFileId,
+  }) async {
+    if (itemId.isEmpty) {
+      throw const OrderCreateException('Missing item id to finalize upload.');
+    }
+    if (driveFileId.isEmpty) {
+      throw const OrderCreateException('Missing Drive file id to finalize.');
     }
 
     try {
       await _dioClient.post(
-        path: ApiConstants.uploadCompletePath,
-        data: {
-          'uploadSessionId': uploadSessionId,
-          'fileName': fileName,
-          'fileSize': fileSize,
-        },
+        path: ApiConstants.orderItemUploadComplete(itemId),
+        data: {'driveFileId': driveFileId},
       );
     } on DioException catch (error, stackTrace) {
       _logger.e(
@@ -306,6 +413,36 @@ class OrderUploadSession {
   final String uploadSessionId;
   final String uploadUrl;
   final int expiresIn;
+}
+
+/// Parsed `data` payload returned by `order/checkout`.
+class OrderCheckoutResult {
+  const OrderCheckoutResult({
+    required this.orderId,
+    required this.status,
+    required this.paymentMethod,
+    required this.grandTotal,
+    required this.message,
+  });
+
+  factory OrderCheckoutResult.fromJson(
+    Map<String, dynamic> json, {
+    String? message,
+  }) {
+    return OrderCheckoutResult(
+      orderId: (json['orderId'] as String?) ?? '',
+      status: (json['status'] as String?) ?? (json['orderStatus'] as String?) ?? '',
+      paymentMethod: (json['paymentMethod'] as String?) ?? '',
+      grandTotal: (json['grandTotal'] as num?) ?? 0,
+      message: message ?? json['message']?.toString() ?? '',
+    );
+  }
+
+  final String orderId;
+  final String status;
+  final String paymentMethod;
+  final num grandTotal;
+  final String message;
 }
 
 class OrderCreateException implements Exception {

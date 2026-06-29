@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/primary_action_button.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../delivery/presentation/pages/order_review_page.dart';
 import '../../data/models/print_config_model.dart';
@@ -772,43 +773,13 @@ class _ProceedButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = _screenScale(context);
-    return SizedBox(
-      width: double.infinity,
+    return PrimaryActionButton(
+      label: label,
+      onPressed: onTap,
       height: 54 * compact,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30 * compact),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF4A23CC), Color(0xFF1248E7)],
-          ),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(30 * compact),
-            onTap: onTap,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16 * compact,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(width: 8 * compact),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white,
-                  size: 20 * compact,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      borderRadius: 30 * compact,
+      fontSize: 16 * compact,
+      iconSize: 20 * compact,
     );
   }
 }

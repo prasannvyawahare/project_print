@@ -34,6 +34,10 @@ class FileUploadTask {
   /// True once the Drive PUT has succeeded, so a retry only re-runs the
   /// `upload/complete` call instead of re-uploading the bytes.
   bool driveUploaded = false;
+
+  /// The metadata Drive returned from the PUT (file id, name, mimeType),
+  /// available for logging or future use after a successful upload.
+  DriveUploadResult? driveResult;
 }
 
 /// Drives parallel uploads of the order's files to their Drive session URLs and
@@ -44,6 +48,7 @@ class FileUploadController extends ChangeNotifier {
     required OrderRemoteDataSource orderDataSource,
     required String accessToken,
     required List<FileUploadTask> tasks,
+    this.onAllUploadsComplete,
   }) : _dataSource = dataSource,
        _orderDataSource = orderDataSource,
        _accessToken = accessToken,
@@ -53,6 +58,14 @@ class FileUploadController extends ChangeNotifier {
   final OrderRemoteDataSource _orderDataSource;
   final String _accessToken;
   final List<FileUploadTask> _tasks;
+
+  /// Called once after every file's `upload/complete` has succeeded, so the
+  /// caller can refresh the finalized order (e.g. fetch `order/order-summary`).
+  final VoidCallback? onAllUploadsComplete;
+
+  /// Guards [onAllUploadsComplete] so it fires only on the first time all
+  /// uploads reach success (not again on a later retry of a failed file).
+  bool _completionNotified = false;
 
   List<FileUploadTask> get tasks => List.unmodifiable(_tasks);
 
@@ -92,7 +105,7 @@ class FileUploadController extends ChangeNotifier {
       // 1) Upload the bytes to the Drive resumable session (skip if a previous
       //    attempt already pushed the file and only the finalize step failed).
       if (!task.driveUploaded) {
-        await _dataSource.uploadFile(
+        task.driveResult = await _dataSource.uploadFile(
           sessionUrl: task.sessionUrl,
           accessToken: _accessToken,
           file: File(task.filePath),
@@ -108,10 +121,11 @@ class FileUploadController extends ChangeNotifier {
       }
 
       // 2) Tell the backend this file is done so it can finalize the item.
+      //    itemId comes from order/create; driveFileId is the id Drive
+      //    returned from the PUT response.
       await _orderDataSource.completeUpload(
-        uploadSessionId: task.uploadSessionId,
-        fileName: task.fileName,
-        fileSize: task.fileSize,
+        itemId: task.itemId,
+        driveFileId: task.driveResult?.id ?? '',
       );
 
       task.status = FileUploadStatus.success;
@@ -120,6 +134,13 @@ class FileUploadController extends ChangeNotifier {
       task.error = error.toString();
     }
     notifyListeners();
+
+    // Once every file's upload/complete has gone through, let the caller fetch
+    // the finalized order summary. Fires only once.
+    if (!_completionNotified && allSucceeded) {
+      _completionNotified = true;
+      onAllUploadsComplete?.call();
+    }
   }
 
   static String _mimeTypeFor(String fileName) {

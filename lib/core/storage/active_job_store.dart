@@ -25,6 +25,9 @@ class ActiveJob {
     required this.status,
     required this.createdAtMs,
     this.address,
+    this.baseRate = 0,
+    this.subtotal = 0,
+    this.deliveryCharge = 0,
   });
 
   final String orderId;
@@ -34,11 +37,27 @@ class ActiveJob {
   final String? address;
   final int createdAtMs;
 
+  /// Billing totals captured from the `order/create` response, kept locally so
+  /// the home "Active Jobs" card can show the price without a network call.
+  final num baseRate;
+  final num subtotal;
+  final num deliveryCharge;
+
   String get title => fileNames.isNotEmpty ? fileNames.first : 'Print order';
 
   int get fileCount => fileNames.isEmpty ? 1 : fileNames.length;
 
-  ActiveJob copyWith({String? step, String? status, String? address}) {
+  /// Subtotal + delivery charge.
+  num get grandTotal => subtotal + deliveryCharge;
+
+  ActiveJob copyWith({
+    String? step,
+    String? status,
+    String? address,
+    num? baseRate,
+    num? subtotal,
+    num? deliveryCharge,
+  }) {
     return ActiveJob(
       orderId: orderId,
       fileNames: fileNames,
@@ -46,6 +65,9 @@ class ActiveJob {
       status: status ?? this.status,
       address: address ?? this.address,
       createdAtMs: createdAtMs,
+      baseRate: baseRate ?? this.baseRate,
+      subtotal: subtotal ?? this.subtotal,
+      deliveryCharge: deliveryCharge ?? this.deliveryCharge,
     );
   }
 
@@ -56,6 +78,9 @@ class ActiveJob {
     'status': status,
     'address': address,
     'createdAtMs': createdAtMs,
+    'baseRate': baseRate,
+    'subtotal': subtotal,
+    'deliveryCharge': deliveryCharge,
   };
 
   factory ActiveJob.fromJson(Map<String, dynamic> json) {
@@ -69,6 +94,9 @@ class ActiveJob {
       status: json['status']?.toString() ?? 'Pending delivery details',
       address: json['address']?.toString(),
       createdAtMs: (json['createdAtMs'] as num?)?.toInt() ?? 0,
+      baseRate: (json['baseRate'] as num?) ?? 0,
+      subtotal: (json['subtotal'] as num?) ?? 0,
+      deliveryCharge: (json['deliveryCharge'] as num?) ?? 0,
     );
   }
 }
@@ -122,11 +150,21 @@ class ActiveJobStore {
     required String step,
     String? status,
     String? address,
+    num? baseRate,
+    num? subtotal,
+    num? deliveryCharge,
   }) async {
     final existing = findById(orderId);
     if (existing == null) return;
     await upsert(
-      existing.copyWith(step: step, status: status, address: address),
+      existing.copyWith(
+        step: step,
+        status: status,
+        address: address,
+        baseRate: baseRate,
+        subtotal: subtotal,
+        deliveryCharge: deliveryCharge,
+      ),
     );
   }
 
