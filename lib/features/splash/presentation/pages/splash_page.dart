@@ -27,7 +27,7 @@ class _SplashPageState extends State<SplashPage> {
       Duration(milliseconds: _config.displayMilliseconds),
       () {
         if (!mounted) return;
-        final hasActiveSession = sl<TemporaryAuthStore>().token.isNotEmpty;
+        final hasActiveSession = sl<TemporaryAuthStore>().hasValidToken;
         final nextRoute = hasActiveSession
             ? AppRouter.home
             : AppRouter.onboarding;

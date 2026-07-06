@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
+import '../../app/router/app_router.dart';
 import '../constants/api_constants.dart';
 import '../storage/temporary_auth_store.dart';
 
@@ -38,6 +40,13 @@ class DioClient {
           options.headers['x-client-platform'] = 'mobile';
           handler.next(options);
         },
+        onError: (error, handler) {
+          final statusCode = error.response?.statusCode;
+          if (statusCode == 401 || statusCode == 403) {
+            _handleUnauthorized();
+          }
+          handler.next(error);
+        },
       ),
     );
 
@@ -56,6 +65,28 @@ class DioClient {
 
   final Dio _dio;
   final TemporaryAuthStore _temporaryAuthStore;
+
+  /// Guards against multiple concurrent 401/403 responses each pushing the
+  /// login screen.
+  bool _isRedirectingToLogin = false;
+
+  /// Clears the stored session and sends the user back to the login screen
+  /// whenever the server rejects the token (401/403). Safe to call from
+  /// anywhere via the global navigator key.
+  void _handleUnauthorized() {
+    if (_isRedirectingToLogin) return;
+
+    final navigator = AppRouter.navigatorKey.currentState;
+    if (navigator == null) return;
+
+    _isRedirectingToLogin = true;
+    _temporaryAuthStore.clear();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigator.pushNamedAndRemoveUntil(AppRouter.auth, (route) => false);
+      _isRedirectingToLogin = false;
+    });
+  }
 
   Future<Response<dynamic>> get({
     required String path,

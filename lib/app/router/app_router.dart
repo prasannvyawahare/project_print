@@ -13,6 +13,11 @@ import '../../features/splash/presentation/pages/splash_page.dart';
 class AppRouter {
   const AppRouter._();
 
+  /// Global navigator key so navigation can be triggered from outside the
+  /// widget tree (e.g. the Dio error interceptor on an invalid token).
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   static const String splash = '/';
   static const String onboarding = '/onboarding';
   static const String auth = '/auth';

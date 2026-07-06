@@ -20,6 +20,7 @@ class App extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
+      navigatorKey: AppRouter.navigatorKey,
       onGenerateRoute: AppRouter.generateRoute,
       initialRoute: AppRouter.splash,
     );

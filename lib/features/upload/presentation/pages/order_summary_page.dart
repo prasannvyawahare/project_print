@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pay/pay.dart';
 
+import '../../../../core/constants/payment_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/widgets/primary_action_button.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
@@ -196,6 +198,13 @@ class _SummaryContentState extends State<_SummaryContent> {
   String? _appliedCode;
   double _appliedRate = 0;
 
+  /// Google Pay client built from [kGooglePayConfig].
+  final Pay _payClient = Pay({
+    PayProvider.google_pay: PaymentConfiguration.fromJsonString(
+      kGooglePayConfig,
+    ),
+  });
+
   /// True once `order/checkout` has succeeded. Keeps the Pay button hidden
   /// after the order is placed.
   bool _orderPlaced = false;
@@ -210,7 +219,62 @@ class _SummaryContentState extends State<_SummaryContent> {
     super.dispose();
   }
 
-  Future<void> _placeOrder(double amountToPay) async {
+  /// Opens the Google Pay sheet for [amountToPay]. On a successful payment the
+  /// backend `order/checkout` is called; if the user cancels or Google Pay is
+  /// unavailable, nothing is charged and the Pay button stays visible.
+  Future<void> _payWithGooglePay(double amountToPay) async {
+    final addressId = widget.addressId;
+    if (addressId == null || addressId.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Please select a delivery address.')),
+        );
+      return;
+    }
+
+    try {
+      final result = await _payClient.showPaymentSelector(
+        PayProvider.google_pay,
+        [
+          PaymentItem(
+            label: 'Total',
+            amount: amountToPay.toStringAsFixed(2),
+            status: PaymentItemStatus.final_price,
+          ),
+        ],
+      );
+      if (!mounted) return;
+      // `result` carries the Google Pay payment token under
+      // paymentMethodData.tokenizationData.token — forward it to the backend
+      // once the checkout API accepts a gateway token.
+      debugPrint('Google Pay result: $result');
+      await _placeOrder(amountToPay, paymentMethod: 'GOOGLE_PAY');
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      // `paymentCanceled` is a normal user action — stay silent for it.
+      if (error.code == 'paymentCanceled') return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(error.message ?? 'Google Pay is unavailable.'),
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Payment could not be completed.')),
+        );
+    }
+  }
+
+  Future<void> _placeOrder(
+    double amountToPay, {
+    String paymentMethod = 'COD',
+  }) async {
     final addressId = widget.addressId;
     if (addressId == null || addressId.isEmpty) {
       ScaffoldMessenger.of(context)
@@ -226,7 +290,7 @@ class _SummaryContentState extends State<_SummaryContent> {
       final result = await sl<OrderRemoteDataSource>().checkout(
         orderId: widget.orderId,
         addressId: addressId,
-        paymentMethod: 'COD',
+        paymentMethod: paymentMethod,
       );
       if (!mounted) return;
       // Stay on this screen and just hide the Pay button. The post-checkout
@@ -378,7 +442,7 @@ class _SummaryContentState extends State<_SummaryContent> {
           _PaymentBar(
             total: amountToPay,
             processing: false,
-            onPay: () => _placeOrder(amountToPay),
+            onPay: () => _payWithGooglePay(amountToPay),
           ),
       ],
     );
