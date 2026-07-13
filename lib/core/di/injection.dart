@@ -70,8 +70,11 @@ Future<void> initDependencies() async {
   );
 
   sl.registerLazySingleton<DioClient>(
-    () =>
-        DioClient(dio: sl<Dio>(), temporaryAuthStore: sl<TemporaryAuthStore>()),
+    () => DioClient(
+      dio: sl<Dio>(),
+      temporaryAuthStore: sl<TemporaryAuthStore>(),
+      firebaseAuth: sl<FirebaseAuth>(),
+    ),
   );
 
   sl.registerLazySingleton<NetworkInfo>(

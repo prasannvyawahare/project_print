@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 
@@ -7,9 +8,13 @@ import '../constants/api_constants.dart';
 import '../storage/temporary_auth_store.dart';
 
 class DioClient {
-  DioClient({required Dio dio, required TemporaryAuthStore temporaryAuthStore})
-    : _dio = dio,
-      _temporaryAuthStore = temporaryAuthStore {
+  DioClient({
+    required Dio dio,
+    required TemporaryAuthStore temporaryAuthStore,
+    required FirebaseAuth firebaseAuth,
+  }) : _dio = dio,
+       _temporaryAuthStore = temporaryAuthStore,
+       _firebaseAuth = firebaseAuth {
     _dio.options = BaseOptions(
       baseUrl: ApiConstants.baseUrl,
       connectTimeout: const Duration(seconds: 30),
@@ -20,7 +25,7 @@ class DioClient {
 
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) {
+        onRequest: (options, handler) async {
           final shouldOmitContentType =
               options.extra['omitContentType'] == true;
           if (shouldOmitContentType) {
@@ -29,13 +34,15 @@ class DioClient {
             options.contentType = null;
           }
 
-          final token = _temporaryAuthStore.token;
           final hasAuthorizationHeader = options.headers.keys.any(
             (key) => key.toString().toLowerCase() == 'authorization',
           );
 
-          if (token.isNotEmpty && !hasAuthorizationHeader) {
-            options.headers['Authorization'] = 'Bearer $token';
+          if (!hasAuthorizationHeader) {
+            final token = await _resolveFreshIdToken();
+            if (token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
           }
           options.headers['x-client-platform'] = 'mobile';
           handler.next(options);
@@ -65,6 +72,32 @@ class DioClient {
 
   final Dio _dio;
   final TemporaryAuthStore _temporaryAuthStore;
+  final FirebaseAuth _firebaseAuth;
+
+  /// Returns a valid Firebase ID token, refreshing via Firebase when the
+  /// cached copy is expired. Falls back to whatever is currently stored if
+  /// Firebase has no user or the refresh call fails, so requests can still
+  /// proceed (the server will reject with 401 if the token is truly bad).
+  Future<String> _resolveFreshIdToken() async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null) {
+      try {
+        final fresh = await user.getIdToken();
+        if (fresh != null && fresh.isNotEmpty) {
+          if (fresh != _temporaryAuthStore.token) {
+            await _temporaryAuthStore.save(
+              mobile: _temporaryAuthStore.mobile,
+              token: fresh,
+            );
+          }
+          return fresh;
+        }
+      } catch (_) {
+        // fall through to stored token
+      }
+    }
+    return _temporaryAuthStore.token;
+  }
 
   /// Guards against multiple concurrent 401/403 responses each pushing the
   /// login screen.

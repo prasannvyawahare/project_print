@@ -3,4 +3,8 @@ class ServerException implements Exception {
 
   final String message;
   final int? statusCode;
+
+  @override
+  String toString() =>
+      'ServerException(status: $statusCode, message: $message)';
 }
