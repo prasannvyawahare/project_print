@@ -215,187 +215,35 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
   }
 
   Future<void> _showAddAddressSheet(BuildContext pageContext) async {
-    final addressController = TextEditingController();
-    final flatController = TextEditingController();
-    final landmarkController = TextEditingController();
-    final pincodeController = TextEditingController();
-    var selectedType = 'home';
-
     await showModalBottomSheet<void>(
       context: pageContext,
       isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: Colors.white,
       builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                8,
-                20,
-                20 + MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Add New Address',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: _primaryText,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Address Type',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF4F4C5D),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      children: [
-                        for (final type in ['home', 'office', 'other'])
-                          ChoiceChip(
-                            label: Text(
-                              type[0].toUpperCase() + type.substring(1),
-                            ),
-                            selected: selectedType == type,
-                            onSelected: (_) =>
-                                setSheetState(() => selectedType = type),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    TextField(
-                      controller: addressController,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        labelText: 'Address *',
-                        hintText: 'e.g. Malad East, Mumbai',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: flatController,
-                      decoration: InputDecoration(
-                        labelText: 'Flat / House No. *',
-                        hintText: 'e.g. 701 3A',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: landmarkController,
-                      decoration: InputDecoration(
-                        labelText: 'Landmark',
-                        hintText: 'e.g. Near Xavier School',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: pincodeController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(6),
-                      ],
-                      decoration: InputDecoration(
-                        labelText: 'Pincode *',
-                        hintText: 'e.g. 400097',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _accent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                        ),
-                        onPressed: () {
-                          final address = addressController.text.trim();
-                          final flat = flatController.text.trim();
-                          final pincodeText = pincodeController.text.trim();
-
-                          if (address.isEmpty ||
-                              flat.isEmpty ||
-                              pincodeText.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Please fill address, flat and pincode',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-
-                          final pincode = int.tryParse(pincodeText) ?? 0;
-                          if (pincode == 0) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter a valid pincode'),
-                              ),
-                            );
-                            return;
-                          }
-
-                          pageContext.read<AddressBloc>().add(
-                            AddressCreateRequested(
-                              addressType: selectedType,
-                              address: address,
-                              flat: flat,
-                              landmark: landmarkController.text.trim(),
-                              pincode: pincode,
-                            ),
-                          );
-                          Navigator.of(sheetContext).pop();
-                        },
-                        child: const Text(
-                          'Save Address',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              ),
-            );
-          },
+        return _AddAddressSheet(
+          onSubmit:
+              ({
+                required String addressType,
+                required String address,
+                required String flat,
+                required String landmark,
+                required int pincode,
+              }) {
+                pageContext.read<AddressBloc>().add(
+                  AddressCreateRequested(
+                    addressType: addressType,
+                    address: address,
+                    flat: flat,
+                    landmark: landmark,
+                    pincode: pincode,
+                  ),
+                );
+                Navigator.of(sheetContext).pop();
+              },
         );
       },
     );
-
-    addressController.dispose();
-    flatController.dispose();
-    landmarkController.dispose();
-    pincodeController.dispose();
   }
 
   IconData _iconForType(String type) {
@@ -575,7 +423,6 @@ class _UploadQueueSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const accent = Color(0xFF3E34D3);
-    const pageBackground = Color(0xFFF5F2FA);
     const titleColor = Color(0xFF1F1F2E);
     return AnimatedBuilder(
       animation: controller,
@@ -1024,6 +871,193 @@ class _QueueFileCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Add Address bottom sheet ─────────────────────────────────────────────────
+/// Owns its own [TextEditingController]s so they are disposed exactly when the
+/// sheet is removed from the tree — avoiding the "used after being disposed"
+/// crash that happened when controllers were disposed manually after the
+/// `showModalBottomSheet` future completed.
+typedef _AddAddressSubmit =
+    void Function({
+      required String addressType,
+      required String address,
+      required String flat,
+      required String landmark,
+      required int pincode,
+    });
+
+class _AddAddressSheet extends StatefulWidget {
+  const _AddAddressSheet({required this.onSubmit});
+
+  final _AddAddressSubmit onSubmit;
+
+  @override
+  State<_AddAddressSheet> createState() => _AddAddressSheetState();
+}
+
+class _AddAddressSheetState extends State<_AddAddressSheet> {
+  final _addressController = TextEditingController();
+  final _flatController = TextEditingController();
+  final _landmarkController = TextEditingController();
+  final _pincodeController = TextEditingController();
+  String _selectedType = 'home';
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    _flatController.dispose();
+    _landmarkController.dispose();
+    _pincodeController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final address = _addressController.text.trim();
+    final flat = _flatController.text.trim();
+    final pincodeText = _pincodeController.text.trim();
+
+    if (address.isEmpty || flat.isEmpty || pincodeText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill address, flat and pincode')),
+      );
+      return;
+    }
+
+    final pincode = int.tryParse(pincodeText) ?? 0;
+    if (pincode == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid pincode')),
+      );
+      return;
+    }
+
+    widget.onSubmit(
+      addressType: _selectedType,
+      address: address,
+      flat: flat,
+      landmark: _landmarkController.text.trim(),
+      pincode: pincode,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        20 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Add New Address',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: _primaryText,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Address Type',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF4F4C5D),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 10,
+              children: [
+                for (final type in ['home', 'office', 'other'])
+                  ChoiceChip(
+                    label: Text(type[0].toUpperCase() + type.substring(1)),
+                    selected: _selectedType == type,
+                    onSelected: (_) => setState(() => _selectedType = type),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _addressController,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Address *',
+                hintText: 'e.g. Malad East, Mumbai',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _flatController,
+              decoration: InputDecoration(
+                labelText: 'Flat / House No. *',
+                hintText: 'e.g. 701 3A',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _landmarkController,
+              decoration: InputDecoration(
+                labelText: 'Landmark',
+                hintText: 'e.g. Near Xavier School',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _pincodeController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              decoration: InputDecoration(
+                labelText: 'Pincode *',
+                hintText: 'e.g. 400097',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _accent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: _submit,
+                child: const Text(
+                  'Save Address',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
       ),
     );
   }

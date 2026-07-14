@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pay/pay.dart';
@@ -198,12 +201,9 @@ class _SummaryContentState extends State<_SummaryContent> {
   String? _appliedCode;
   double _appliedRate = 0;
 
-  /// Google Pay client built from [kGooglePayConfig].
-  final Pay _payClient = Pay({
-    PayProvider.google_pay: PaymentConfiguration.fromJsonString(
-      kGooglePayConfig,
-    ),
-  });
+  /// Google Pay configuration built once from [kGooglePayConfig]. Passed to the
+  /// [GooglePayButton] which manages the payment sheet and its result stream.
+  late final PaymentConfiguration _payConfig;
 
   /// True once `order/checkout` has succeeded. Keeps the Pay button hidden
   /// after the order is placed.
@@ -214,61 +214,36 @@ class _SummaryContentState extends State<_SummaryContent> {
   bool _showPlacingBar = false;
 
   @override
+  void initState() {
+    super.initState();
+    _payConfig = PaymentConfiguration.fromJsonString(kGooglePayConfig);
+  }
+
+  @override
   void dispose() {
     _promoController.dispose();
     super.dispose();
   }
 
-  /// Opens the Google Pay sheet for [amountToPay]. On a successful payment the
-  /// backend `order/checkout` is called; if the user cancels or Google Pay is
-  /// unavailable, nothing is charged and the Pay button stays visible.
-  Future<void> _payWithGooglePay(double amountToPay) async {
-    final addressId = widget.addressId;
-    if (addressId == null || addressId.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('Please select a delivery address.')),
-        );
-      return;
-    }
+  /// Called by [GooglePayButton] once the Google Pay sheet completes
+  /// successfully. [result] carries the payment token under
+  /// `paymentMethodData.tokenizationData.token`; forward it to the backend
+  /// once the checkout API accepts a gateway token.
+  void _onGooglePayResult(Map<String, dynamic> result, double amountToPay) {
+    debugPrint('Google Pay result: ${jsonEncode(result)}');
+    _placeOrder(amountToPay, paymentMethod: 'GOOGLE_PAY');
+  }
 
-    try {
-      final result = await _payClient.showPaymentSelector(
-        PayProvider.google_pay,
-        [
-          PaymentItem(
-            label: 'Total',
-            amount: amountToPay.toStringAsFixed(2),
-            status: PaymentItemStatus.final_price,
-          ),
-        ],
+  /// Called by [GooglePayButton] when the sheet is cancelled or errors.
+  void _onGooglePayError(Object? error) {
+    debugPrint('Google Pay error: $error');
+    if (!mounted) return;
+    if (error is PlatformException && error.code == 'paymentCanceled') return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(content: Text('Payment could not be completed.')),
       );
-      if (!mounted) return;
-      // `result` carries the Google Pay payment token under
-      // paymentMethodData.tokenizationData.token — forward it to the backend
-      // once the checkout API accepts a gateway token.
-      debugPrint('Google Pay result: $result');
-      await _placeOrder(amountToPay, paymentMethod: 'GOOGLE_PAY');
-    } on PlatformException catch (error) {
-      if (!mounted) return;
-      // `paymentCanceled` is a normal user action — stay silent for it.
-      if (error.code == 'paymentCanceled') return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(error.message ?? 'Google Pay is unavailable.'),
-          ),
-        );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('Payment could not be completed.')),
-        );
-    }
   }
 
   Future<void> _placeOrder(
@@ -442,7 +417,11 @@ class _SummaryContentState extends State<_SummaryContent> {
           _PaymentBar(
             total: amountToPay,
             processing: false,
-            onPay: () => _payWithGooglePay(amountToPay),
+            paymentConfiguration: _payConfig,
+            onPay: () => _placeOrder(amountToPay),
+            onGooglePayResult: (result) =>
+                _onGooglePayResult(result, amountToPay),
+            onGooglePayError: _onGooglePayError,
           ),
       ],
     );
@@ -953,16 +932,74 @@ class _PaymentBar extends StatelessWidget {
   const _PaymentBar({
     required this.total,
     required this.processing,
+    required this.paymentConfiguration,
     required this.onPay,
+    required this.onGooglePayResult,
+    required this.onGooglePayError,
   });
 
   final num total;
   final bool processing;
+  final PaymentConfiguration paymentConfiguration;
+
+  /// Fallback pay action for platforms/devices without Google Pay.
   final VoidCallback onPay;
+
+  /// Called with the Google Pay result once the sheet completes successfully.
+  final void Function(Map<String, dynamic> result) onGooglePayResult;
+
+  /// Called when the Google Pay sheet is cancelled or errors.
+  final void Function(Object? error) onGooglePayError;
 
   @override
   Widget build(BuildContext context) {
     final compact = _screenScale(context);
+    final height = 56.0 * compact;
+
+    final fallbackButton = PrimaryActionButton(
+      label: 'Pay ${_money(total)}',
+      onPressed: onPay,
+      isLoading: processing,
+      height: height,
+      borderRadius: 30 * compact,
+      fontSize: 17 * compact,
+      iconSize: 22 * compact,
+    );
+
+    // Google Pay is Android-only in the `pay` plugin. Elsewhere, fall back to
+    // the standard button (which places the order directly).
+    final Widget payWidget = defaultTargetPlatform == TargetPlatform.android
+        ? GooglePayButton(
+            paymentConfiguration: paymentConfiguration,
+            paymentItems: [
+              PaymentItem(
+                label: 'Total',
+                amount: total.toStringAsFixed(2),
+                status: PaymentItemStatus.final_price,
+              ),
+            ],
+            type: GooglePayButtonType.pay,
+            theme: GooglePayButtonTheme.dark,
+            width: double.infinity,
+            height: height,
+            cornerRadius: (30 * compact).round(),
+            onPaymentResult: onGooglePayResult,
+            onError: onGooglePayError,
+            loadingIndicator: SizedBox(
+              height: height,
+              child: const Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            // Shown when Google Pay isn't available so checkout stays reachable.
+            childOnError: fallbackButton,
+          )
+        : fallbackButton;
+
     return Container(
       color: Colors.white,
       padding: EdgeInsets.fromLTRB(
@@ -971,15 +1008,7 @@ class _PaymentBar extends StatelessWidget {
         18 * compact,
         16 * compact,
       ),
-      child: PrimaryActionButton(
-        label: 'Pay ${_money(total)}',
-        onPressed: onPay,
-        isLoading: processing,
-        height: 56 * compact,
-        borderRadius: 30 * compact,
-        fontSize: 17 * compact,
-        iconSize: 22 * compact,
-      ),
+      child: payWidget,
     );
   }
 }

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -rn \"GooglePayButtonType\\\\|GooglePayButtonTheme\\\\|enum GooglePayButtonType\" \"C:/Users/PrasannVyawahare/AppData/Local/Pub/Cache/hosted/pub.dev/pay_android-3.2.0/lib\" | grep -i \"enum\\\\|pay,\\\\|buy,\" | head; echo \"---exports---\"; grep -rn \"export\" \"C:/Users/PrasannVyawahare/AppData/Local/Pub/Cache/hosted/pub.dev/pay-3.3.0/lib/pay.dart\")",
+      "Read(//c/Users/PrasannVyawahare/AppData/Local/Pub/Cache/hosted/pub.dev/pay_android-3.2.0/lib/**)",
+      "Read(//c/Users/PrasannVyawahare/AppData/Local/Pub/Cache/hosted/pub.dev/pay-3.3.0/lib/**)",
+      "PowerShell(flutter analyze lib/features/upload/presentation/pages/order_summary_page.dart)",
+      "Bash(cd \"C:/Users/PrasannVyawahare/gpay_demo\" 2>/dev/null && echo \"=== TREE \\(lib\\) ===\" && find lib -type f 2>/dev/null && echo \"=== pubspec pay dep ===\" && grep -n \"pay\" pubspec.yaml 2>/dev/null && echo \"=== assets ===\" && find assets -type f 2>/dev/null)",
+      "Read(//c/Users/PrasannVyawahare/gpay_demo/**)",
+      "Read(//c/Users/PrasannVyawahare/gpay_demo/lib/**)",
+      "Read(//c/Users/PrasannVyawahare/gpay_demo/assets/**)",
+      "PowerShell(flutter pub add package_info_plus)",
+      "PowerShell(flutter analyze lib/main.dart lib/core/config/app_environment.dart lib/core/constants/payment_config.dart lib/features/upload/presentation/pages/order_summary_page.dart)",
+      "Bash(break)"
+    ]
+  }
+}

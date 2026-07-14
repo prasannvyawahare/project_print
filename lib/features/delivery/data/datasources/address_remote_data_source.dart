@@ -51,8 +51,12 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
           'pincode': pincode,
         },
       );
-      final data = response.data as Map<String, dynamic>;
-      final addressData = data['data'] as Map<String, dynamic>;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : const <String, dynamic>{};
+      final addressData = data['data'] is Map<String, dynamic>
+          ? data['data'] as Map<String, dynamic>
+          : const <String, dynamic>{};
       return AddressModel.fromJson(addressData);
     } on DioException catch (error) {
       _logger.e('Dio error', error: error, stackTrace: error.stackTrace);
@@ -67,11 +71,18 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
   Future<List<AddressModel>> getAddresses() async {
     try {
       final response = await _dioClient.get(path: ApiConstants.addressGet);
-      final data = response.data as Map<String, dynamic>;
-      final addressData = data['data'] as Map<String, dynamic>;
-      final addressList = addressData['address'] as List<dynamic>;
+      final data = response.data is Map<String, dynamic>
+          ? response.data as Map<String, dynamic>
+          : const <String, dynamic>{};
+      final addressData = data['data'] is Map<String, dynamic>
+          ? data['data'] as Map<String, dynamic>
+          : const <String, dynamic>{};
+      final addressList = addressData['address'] is List
+          ? addressData['address'] as List<dynamic>
+          : const <dynamic>[];
       return addressList
-          .map((e) => AddressModel.fromJson(e as Map<String, dynamic>))
+          .whereType<Map<String, dynamic>>()
+          .map(AddressModel.fromJson)
           .toList();
     } on DioException catch (error) {
       _logger.e('Dio error', error: error, stackTrace: error.stackTrace);

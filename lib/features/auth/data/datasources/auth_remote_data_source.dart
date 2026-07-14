@@ -62,6 +62,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     return '';
   }
 
+  /// True when the backend message signals the user's storage folder has not
+  /// been created yet (e.g. "Folder does not exist.").
+  bool _isFolderMissingMessage(String? message) {
+    if (message == null) return false;
+    final normalized = message.toLowerCase();
+    return normalized.contains('folder does not exist') ||
+        normalized.contains('folder not found') ||
+        (normalized.contains('storage') && normalized.contains('not exist'));
+  }
+
   bool? _extractBoolValue(dynamic value) {
     if (value is bool) {
       return value;
@@ -311,6 +321,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final backendMessage = data is Map<String, dynamic>
           ? (data['message']?.toString() ?? data['error']?.toString())
           : null;
+
+      // Backend returns a non-2xx response with "Folder does not exist."
+      // when the user has no storage yet. That is a valid "not created"
+      // state, not an error — return false so the caller creates storage.
+      if (_isFolderMissingMessage(backendMessage)) {
+        return false;
+      }
 
       throw ServerException(
         message: backendMessage ?? error.message ?? 'Failed to check storage',

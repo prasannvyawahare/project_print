@@ -39,8 +39,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final CreateStorage _createStorage;
   final SignOut _signOut;
 
-  /// Checks if user storage exists and creates it if not.
-  /// Stays in loading state throughout; emits success or failure at the end.
+  /// Ensures the user's storage folder is ready after verify-and-save.
+  ///
+  /// Flow:
+  /// 1. Call `storage-exists`.
+  /// 2. If it exists → done (success).
+  /// 3. If it does not exist (or backend 500) → call `create-storage`,
+  ///    then re-run `storage-exists` to confirm.
+  ///
+  /// The "Folder does not exist." backend message is treated as a normal
+  /// "not created yet" signal and is never surfaced to the user.
   Future<void> _ensureStorageReady(
     String userId,
     Emitter<AuthState> emit,
@@ -49,6 +57,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     await storageResult.fold(
       (failure) async {
+        // Only recover from a backend 500; other failures are real errors.
         final isStorageCheck500 =
             failure is ServerFailure && failure.statusCode == 500;
 
@@ -63,43 +72,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           return;
         }
 
-        // Requested flow for 500 from storage-exists:
-        // 1) create-storage with userId, 2) re-run storage-exists.
-        final createResult = await _createStorage(userId);
-
-        await createResult.fold(
-          (createFailure) async => emit(
-            state.copyWith(
-              status: AuthStatus.failure,
-              errorMessage: createFailure.message,
-              nextStep: AuthNextStep.none,
-            ),
-          ),
-          (_) async {
-            final recheckResult = await _checkStorageExists();
-
-            recheckResult.fold(
-              (recheckFailure) => emit(
-                state.copyWith(
-                  status: AuthStatus.failure,
-                  errorMessage: recheckFailure.message,
-                  nextStep: AuthNextStep.none,
-                ),
-              ),
-              (existsAfterCreate) => emit(
-                state.copyWith(
-                  status: existsAfterCreate
-                      ? AuthStatus.success
-                      : AuthStatus.failure,
-                  errorMessage: existsAfterCreate
-                      ? ''
-                      : 'Storage verification failed after create. Please retry.',
-                  nextStep: AuthNextStep.none,
-                ),
-              ),
-            );
-          },
-        );
+        await _createStorageAndReverify(userId, emit);
       },
       (exists) async {
         if (exists) {
@@ -112,19 +85,47 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           return;
         }
 
-        // Storage doesn't exist — create it.
-        final createResult = await _createStorage(userId);
-        createResult.fold(
-          (failure) => emit(
+        // Storage doesn't exist — create it, then re-run storage-exists.
+        await _createStorageAndReverify(userId, emit);
+      },
+    );
+  }
+
+  /// Runs `create-storage`, then re-runs `storage-exists` to confirm the
+  /// folder now exists. Emits success only when the re-check confirms it.
+  Future<void> _createStorageAndReverify(
+    String userId,
+    Emitter<AuthState> emit,
+  ) async {
+    final createResult = await _createStorage(userId);
+
+    await createResult.fold(
+      (createFailure) async => emit(
+        state.copyWith(
+          status: AuthStatus.failure,
+          errorMessage: createFailure.message,
+          nextStep: AuthNextStep.none,
+        ),
+      ),
+      (_) async {
+        final recheckResult = await _checkStorageExists();
+
+        recheckResult.fold(
+          (recheckFailure) => emit(
             state.copyWith(
               status: AuthStatus.failure,
-              errorMessage: failure.message,
+              errorMessage: recheckFailure.message,
               nextStep: AuthNextStep.none,
             ),
           ),
-          (_) => emit(
+          (existsAfterCreate) => emit(
             state.copyWith(
-              status: AuthStatus.success,
+              status: existsAfterCreate
+                  ? AuthStatus.success
+                  : AuthStatus.failure,
+              errorMessage: existsAfterCreate
+                  ? ''
+                  : 'Storage verification failed after create. Please retry.',
               nextStep: AuthNextStep.none,
             ),
           ),

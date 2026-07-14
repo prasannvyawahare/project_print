@@ -38,6 +38,7 @@ dependencies:
   geolocator: ^13.0.2
   geocoding: ^3.0.0
   pay: ^3.3.0
+  package_info_plus: ^9.0.1
 
 dev_dependencies:
   flutter_test:
