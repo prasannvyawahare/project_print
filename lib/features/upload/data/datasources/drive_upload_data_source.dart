@@ -34,7 +34,6 @@ class DriveUploadDataSource {
   /// finalize the item via `upload/complete`.
   Future<DriveUploadResult> uploadFile({
     required String sessionUrl,
-    required String accessToken,
     required File file,
     required String mimeType,
     void Function(double progress)? onProgress,
@@ -54,8 +53,6 @@ class DriveUploadDataSource {
         data: file.openRead(),
         options: Options(
           headers: {
-            if (accessToken.isNotEmpty)
-              HttpHeaders.authorizationHeader: 'Bearer $accessToken',
             HttpHeaders.contentTypeHeader: mimeType,
             HttpHeaders.contentLengthHeader: length,
           },

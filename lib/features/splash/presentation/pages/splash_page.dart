@@ -1,12 +1,11 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_dimensions.dart';
-import '../../../../core/di/injection.dart';
-import '../../../../core/storage/temporary_auth_store.dart';
 import '../../domain/entities/splash_config.dart';
 
 class SplashPage extends StatefulWidget {
@@ -27,7 +26,7 @@ class _SplashPageState extends State<SplashPage> {
       Duration(milliseconds: _config.displayMilliseconds),
       () {
         if (!mounted) return;
-        final hasActiveSession = sl<TemporaryAuthStore>().hasValidToken;
+        final hasActiveSession = FirebaseAuth.instance.currentUser != null;
         final nextRoute = hasActiveSession
             ? AppRouter.home
             : AppRouter.onboarding;

@@ -45,10 +45,44 @@ class DioClient {
             }
           }
           options.headers['x-client-platform'] = 'mobile';
+          options.cancelToken ??= _sessionCancelToken;
           handler.next(options);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           final statusCode = error.response?.statusCode;
+          final req = error.requestOptions;
+
+          if (statusCode == 401 && req.extra['authRetry'] != true) {
+            final user = _firebaseAuth.currentUser;
+            if (user != null) {
+              try {
+                final fresh = await user.getIdToken(true);
+                if (fresh != null && fresh.isNotEmpty) {
+                  if (fresh != _temporaryAuthStore.token) {
+                    await _temporaryAuthStore.save(
+                      mobile: _temporaryAuthStore.mobile,
+                      token: fresh,
+                    );
+                  }
+                  req.headers['Authorization'] = 'Bearer $fresh';
+                  req.extra['authRetry'] = true;
+                  try {
+                    final response = await _dio.fetch<dynamic>(req);
+                    return handler.resolve(response);
+                  } on DioException catch (retryError) {
+                    final retryStatus = retryError.response?.statusCode;
+                    if (retryStatus == 401 || retryStatus == 403) {
+                      _handleUnauthorized();
+                    }
+                    return handler.next(retryError);
+                  }
+                }
+              } catch (_) {
+                // Fall through to the standard 401/403 handling below.
+              }
+            }
+          }
+
           if (statusCode == 401 || statusCode == 403) {
             _handleUnauthorized();
           }
@@ -73,6 +107,20 @@ class DioClient {
   final Dio _dio;
   final TemporaryAuthStore _temporaryAuthStore;
   final FirebaseAuth _firebaseAuth;
+
+  /// Attached to every outbound request via the auth interceptor. Cancelled
+  /// (and replaced) on sign-out or 401 redirect so pending responses can't
+  /// land after the session ends.
+  CancelToken _sessionCancelToken = CancelToken();
+
+  /// Cancels every in-flight request tagged with the current session token
+  /// and rotates in a fresh token for the next session.
+  void cancelSession([String reason = 'session ended']) {
+    if (!_sessionCancelToken.isCancelled) {
+      _sessionCancelToken.cancel(reason);
+    }
+    _sessionCancelToken = CancelToken();
+  }
 
   /// Returns a valid Firebase ID token, refreshing via Firebase when the
   /// cached copy is expired. Falls back to whatever is currently stored if
@@ -113,6 +161,7 @@ class DioClient {
     if (navigator == null) return;
 
     _isRedirectingToLogin = true;
+    cancelSession('unauthorized');
     _temporaryAuthStore.clear();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

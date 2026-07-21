@@ -46,17 +46,14 @@ class FileUploadController extends ChangeNotifier {
   FileUploadController({
     required DriveUploadDataSource dataSource,
     required OrderRemoteDataSource orderDataSource,
-    required String accessToken,
     required List<FileUploadTask> tasks,
     this.onAllUploadsComplete,
   }) : _dataSource = dataSource,
        _orderDataSource = orderDataSource,
-       _accessToken = accessToken,
        _tasks = tasks;
 
   final DriveUploadDataSource _dataSource;
   final OrderRemoteDataSource _orderDataSource;
-  final String _accessToken;
   final List<FileUploadTask> _tasks;
 
   /// Called once after every file's `upload/complete` has succeeded, so the
@@ -107,7 +104,6 @@ class FileUploadController extends ChangeNotifier {
       if (!task.driveUploaded) {
         task.driveResult = await _dataSource.uploadFile(
           sessionUrl: task.sessionUrl,
-          accessToken: _accessToken,
           file: File(task.filePath),
           mimeType: _mimeTypeFor(task.fileName),
           onProgress: (progress) {

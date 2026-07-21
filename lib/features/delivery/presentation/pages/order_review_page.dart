@@ -4,7 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/storage/active_job_store.dart';
-import '../../../../core/storage/temporary_auth_store.dart';
 import '../../../../core/widgets/primary_action_button.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../../print/domain/entities/print_order_data.dart';
@@ -110,7 +109,6 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
     final controller = FileUploadController(
       dataSource: sl<DriveUploadDataSource>(),
       orderDataSource: sl<OrderRemoteDataSource>(),
-      accessToken: sl<TemporaryAuthStore>().token,
       tasks: tasks,
       onAllUploadsComplete: _fetchSummaryAfterUploads,
     );

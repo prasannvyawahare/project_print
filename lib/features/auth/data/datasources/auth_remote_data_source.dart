@@ -244,29 +244,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         map['userId'],
       ]);
 
-      final backendToken = _firstNonEmptyString([
-        data['token'],
-        data['accessToken'],
-        data['authToken'],
-        data['jwt'],
-        map['token'],
-        map['accessToken'],
-        map['authToken'],
-        map['jwt'],
-      ]);
-
       if (userId.isNotEmpty) {
         await _temporaryAuthStore.saveUserId(userId);
-      }
-
-      if (backendToken.isNotEmpty && backendToken != trimmedToken) {
-        _logger.i(
-          'Switching to backend session token from verify-and-save response',
-        );
-        await _temporaryAuthStore.save(
-          mobile: trimmedMobile,
-          token: backendToken,
-        );
       }
 
       return userId;
@@ -390,6 +369,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> signOut() async {
     try {
+      _dioClient.cancelSession('signed out');
       await _googleSignIn.signOut();
       await _firebaseAuth.signOut();
       await _temporaryAuthStore.clear();
