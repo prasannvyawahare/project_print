@@ -12,7 +12,6 @@ import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/check_storage_exists.dart';
 import '../../features/auth/domain/usecases/create_storage.dart';
-import '../../features/auth/domain/usecases/sign_in_with_apple.dart';
 import '../../features/auth/domain/usecases/sign_in_with_google.dart';
 import '../../features/auth/domain/usecases/sign_out.dart';
 import '../../features/auth/domain/usecases/verify_and_save_user.dart';
@@ -106,10 +105,6 @@ Future<void> initDependencies() async {
     () => SignInWithGoogle(sl<AuthRepository>()),
   );
 
-  sl.registerLazySingleton<SignInWithApple>(
-    () => SignInWithApple(sl<AuthRepository>()),
-  );
-
   sl.registerLazySingleton<VerifyAndSaveUser>(
     () => VerifyAndSaveUser(sl<AuthRepository>()),
   );
@@ -127,7 +122,6 @@ Future<void> initDependencies() async {
   sl.registerFactory<AuthBloc>(
     () => AuthBloc(
       signInWithGoogle: sl<SignInWithGoogle>(),
-      signInWithApple: sl<SignInWithApple>(),
       verifyAndSaveUser: sl<VerifyAndSaveUser>(),
       checkStorageExists: sl<CheckStorageExists>(),
       createStorage: sl<CreateStorage>(),

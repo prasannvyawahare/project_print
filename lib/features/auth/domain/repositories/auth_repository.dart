@@ -12,6 +12,5 @@ abstract class AuthRepository {
   });
   Future<Either<Failure, bool>> checkStorageExists();
   Future<Either<Failure, Unit>> createStorage(String userId);
-  Future<Either<Failure, Unit>> signInWithApple();
   Future<Either<Failure, Unit>> signOut();
 }

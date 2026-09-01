@@ -28,10 +28,18 @@ class AppConstants {
   static const String authSubtitle =
       'Your high-speed print station is one tap away';
   static const String continueWithGoogle = 'Continue with Google';
-  static const String continueWithApple = 'Continue with Apple';
   static const String login = 'Login';
   static const String register = 'Register';
   static const String authFooter = 'PRECISION IN EVERY PIXEL';
+
+  static const String mobileNumberTitle = 'Add your mobile number';
+  static const String mobileNumberSubtitle =
+      "We'll use this to verify your account and coordinate delivery.";
+  static const String mobileNumberHint = 'Enter your 10-digit mobile number';
+  static const String mobileNumberInvalid = 'Enter a valid mobile number';
+  static const String mobileNumberRequired = 'Mobile number is required';
+  static const String continueLabel = 'Continue';
+  static const String notYouSignOut = 'Not you? Sign out';
 }
 
 class AppDurations {
@@ -68,6 +76,24 @@ class AppColors {
 
   static const Color googleRed = Color(0xFFEA4335);
   static const Color googleButtonText = Color(0xFF2A334D);
+
+  /// Dashboard-specific tones (formerly local consts duplicated in
+  /// home_page.dart). Distinct from the brand indigo/heading colors used on
+  /// splash/onboarding/login — kept as their own named tokens rather than
+  /// forced to match, to avoid changing the dashboard's existing look.
+  static const Color dashboardAccent = Color(0xFF2563EB);
+  static const Color dashboardBackground = Color(0xFFF6F8FC);
+  static const Color dashboardPrimaryText = Color(0xFF1B1B2F);
+  static const Color dashboardMutedText = Color(0xFF8B8B9C);
+
+  /// Checkout-specific tones (formerly local consts duplicated in
+  /// order_summary_page.dart).
+  static const Color checkoutMutedText = Color(0xFF6E6A7C);
+  static const Color success = Color(0xFF1B9E54);
+
+  /// Shared error/danger tone. Also used as [ColorScheme.error] in
+  /// AppTheme, so this is the single source of truth for it.
+  static const Color error = Color(0xFFD93025);
 
   static const Color fadeShape = Color(0x24FFFFFF);
   static const Color splashWhite90 = Color(0xE6FFFFFF);

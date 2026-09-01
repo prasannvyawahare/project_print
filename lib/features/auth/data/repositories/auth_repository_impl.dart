@@ -130,33 +130,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, Unit>> signInWithApple() async {
-    final hasConnection = await _networkInfo.isConnected;
-    if (!hasConnection) {
-      return const Left(ConnectionFailure('No internet connection'));
-    }
-
-    try {
-      await _remoteDataSource.signInWithApple();
-      return const Right(unit);
-    } on ServerException catch (error, stackTrace) {
-      _logger.e(
-        'Apple auth server exception',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      return Left(ServerFailure(error.message, statusCode: error.statusCode));
-    } catch (error, stackTrace) {
-      _logger.e(
-        'Apple auth unknown exception',
-        error: error,
-        stackTrace: stackTrace,
-      );
-      return const Left(ServerFailure('Apple authentication failed'));
-    }
-  }
-
-  @override
   Future<Either<Failure, Unit>> signOut() async {
     try {
       await _remoteDataSource.signOut();

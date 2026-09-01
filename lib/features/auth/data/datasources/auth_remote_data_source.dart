@@ -2,7 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/error/exceptions.dart';
@@ -19,7 +18,6 @@ abstract class AuthRemoteDataSource {
   });
   Future<bool> checkStorageExists();
   Future<void> createStorage(String userId);
-  Future<void> signInWithApple();
   Future<void> signOut();
 }
 
@@ -341,29 +339,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (error is ServerException) rethrow;
       throw ServerException(message: 'Failed to create storage');
     }
-  }
-
-  @override
-  Future<void> signInWithApple() async {
-    final bool isAvailable = await SignInWithApple.isAvailable();
-    if (!isAvailable) {
-      throw Exception('Apple sign-in is not available on this device.');
-    }
-
-    final AuthorizationCredentialAppleID appleCredential =
-        await SignInWithApple.getAppleIDCredential(
-          scopes: [
-            AppleIDAuthorizationScopes.email,
-            AppleIDAuthorizationScopes.fullName,
-          ],
-        );
-
-    final OAuthCredential credential = OAuthProvider('apple.com').credential(
-      idToken: appleCredential.identityToken,
-      accessToken: appleCredential.authorizationCode,
-    );
-
-    await _firebaseAuth.signInWithCredential(credential);
   }
 
   @override

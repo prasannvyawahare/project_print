@@ -7,6 +7,7 @@ import '../../../../core/constants/app_dimensions.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import 'mobile_number_page.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({super.key});
@@ -16,15 +17,11 @@ class AuthPage extends StatefulWidget {
 }
 
 class _AuthPageState extends State<AuthPage> {
-  bool _isMobileDialogOpen = false;
+  bool _isMobileScreenOpen = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // The mobile-number dialog opens the keyboard over this screen. Without
-      // this, the Scaffold shrinks and the fixed-height background Column (which
-      // ends in a Spacer) overflows. The dialog handles its own keyboard insets.
-      resizeToAvoidBottomInset: false,
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state.nextStep == AuthNextStep.enterMobile) {
@@ -33,13 +30,15 @@ class _AuthPageState extends State<AuthPage> {
                 return;
               }
 
-              _showMobileNumberDialog(context, state);
+              _openMobileNumberScreen(context);
             });
             return;
           }
 
           if (state.status == AuthStatus.success) {
-            Navigator.of(context).pushReplacementNamed(AppRouter.main);
+            Navigator.of(
+              context,
+            ).pushNamedAndRemoveUntil(AppRouter.main, (route) => false);
           }
 
           if (state.status == AuthStatus.loggedOut) {
@@ -48,8 +47,11 @@ class _AuthPageState extends State<AuthPage> {
               ..showSnackBar(const SnackBar(content: Text('Logged out')));
           }
 
+          // The mobile-number screen shows its own inline error while it's
+          // open, so the snackbar here would fire behind it, unseen.
           if (state.status == AuthStatus.failure &&
-              state.errorMessage.isNotEmpty) {
+              state.errorMessage.isNotEmpty &&
+              !_isMobileScreenOpen) {
             ScaffoldMessenger.of(context)
               ..clearSnackBars()
               ..showSnackBar(SnackBar(content: Text(state.errorMessage)));
@@ -270,35 +272,6 @@ class _AuthPageState extends State<AuthPage> {
                                   ),
                                 ),
                                 SizedBox(
-                                  height: AppDimensions.spacing10 * scale,
-                                ),
-                                _SocialButton(
-                                  onPressed: isSigningIn
-                                      ? null
-                                      : () => context.read<AuthBloc>().add(
-                                          const AuthAppleSignInRequested(),
-                                        ),
-                                  text: AppConstants.continueWithApple,
-                                  backgroundColor: AppColors.navy,
-                                  textColor: AppColors.white,
-                                  buttonHeight: socialButtonHeight,
-                                  textSize: socialTextSize,
-                                  iconSlotWidth:
-                                      (AppDimensions.spacing44 * scale).clamp(
-                                        AppDimensions.spacing34,
-                                        AppDimensions.spacing44,
-                                      ),
-                                  icon: Icon(
-                                    Icons.apple,
-                                    color: AppColors.white,
-                                    size: (AppDimensions.spacing34 * scale)
-                                        .clamp(
-                                          AppDimensions.spacing24,
-                                          AppDimensions.spacing34,
-                                        ),
-                                  ),
-                                ),
-                                SizedBox(
                                   height: AppDimensions.spacing56 * scale,
                                 ),
                                 const Spacer(),
@@ -432,39 +405,27 @@ class _AuthPageState extends State<AuthPage> {
     );
   }
 
-  Future<void> _showMobileNumberDialog(
-    BuildContext context,
-    AuthState state,
-  ) async {
-    if (_isMobileDialogOpen || !mounted) {
+  Future<void> _openMobileNumberScreen(BuildContext context) async {
+    if (_isMobileScreenOpen || !mounted) {
       return;
     }
 
-    _isMobileDialogOpen = true;
+    _isMobileScreenOpen = true;
+    final authBloc = context.read<AuthBloc>();
 
     try {
-      final mobile = await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) => const _MobileNumberDialog(),
-      );
-
-      if (!mounted || mobile == null || mobile.isEmpty) {
-        return;
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      context.read<AuthBloc>().add(
-        AuthManualMobileSubmitted(
-          mobile: mobile,
-          token: state.pendingAuthToken,
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => BlocProvider.value(
+            value: authBloc,
+            child: const MobileNumberPage(),
+          ),
         ),
       );
     } finally {
-      _isMobileDialogOpen = false;
+      if (mounted) {
+        _isMobileScreenOpen = false;
+      }
     }
   }
 
@@ -584,64 +545,6 @@ class _FadedShape extends StatelessWidget {
         color: AppColors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppDimensions.radius52),
       ),
-    );
-  }
-}
-
-class _MobileNumberDialog extends StatefulWidget {
-  const _MobileNumberDialog();
-
-  @override
-  State<_MobileNumberDialog> createState() => _MobileNumberDialogState();
-}
-
-class _MobileNumberDialogState extends State<_MobileNumberDialog> {
-  final TextEditingController _mobileController = TextEditingController();
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
-  @override
-  void dispose() {
-    _mobileController.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    if (_formKey.currentState?.validate() ?? false) {
-      Navigator.of(context).pop(_mobileController.text.trim());
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add mobile number'),
-      content: Form(
-        key: _formKey,
-        child: TextFormField(
-          controller: _mobileController,
-          autofocus: true,
-          keyboardType: TextInputType.phone,
-          textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(
-            labelText: 'Mobile number',
-            hintText: 'Enter your mobile number',
-          ),
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Mobile number is required';
-            }
-            return null;
-          },
-          onFieldSubmitted: (_) => _submit(),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _submit, child: const Text('Continue')),
-      ],
     );
   }
 }

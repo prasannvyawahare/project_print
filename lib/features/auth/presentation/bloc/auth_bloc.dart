@@ -4,7 +4,6 @@ import '../../../../core/error/failures.dart';
 
 import '../../domain/usecases/check_storage_exists.dart';
 import '../../domain/usecases/create_storage.dart';
-import '../../domain/usecases/sign_in_with_apple.dart';
 import '../../domain/usecases/sign_in_with_google.dart';
 import '../../domain/usecases/sign_out.dart';
 import '../../domain/usecases/verify_and_save_user.dart';
@@ -14,26 +13,22 @@ import 'auth_state.dart';
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc({
     required SignInWithGoogle signInWithGoogle,
-    required SignInWithApple signInWithApple,
     required VerifyAndSaveUser verifyAndSaveUser,
     required CheckStorageExists checkStorageExists,
     required CreateStorage createStorage,
     required SignOut signOut,
   }) : _signInWithGoogle = signInWithGoogle,
-       _signInWithApple = signInWithApple,
        _verifyAndSaveUser = verifyAndSaveUser,
        _checkStorageExists = checkStorageExists,
        _createStorage = createStorage,
        _signOut = signOut,
        super(const AuthState()) {
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
-    on<AuthAppleSignInRequested>(_onAppleSignInRequested);
     on<AuthManualMobileSubmitted>(_onManualMobileSubmitted);
     on<AuthLogoutRequested>(_onLogoutRequested);
   }
 
   final SignInWithGoogle _signInWithGoogle;
-  final SignInWithApple _signInWithApple;
   final VerifyAndSaveUser _verifyAndSaveUser;
   final CheckStorageExists _checkStorageExists;
   final CreateStorage _createStorage;
@@ -198,28 +193,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           (userId) async => _ensureStorageReady(userId, emit),
         );
       },
-    );
-  }
-
-  Future<void> _onAppleSignInRequested(
-    AuthAppleSignInRequested event,
-    Emitter<AuthState> emit,
-  ) async {
-    emit(state.copyWith(status: AuthStatus.loading, errorMessage: ''));
-
-    final result = await _signInWithApple();
-
-    result.fold(
-      (failure) => emit(
-        state.copyWith(
-          status: AuthStatus.failure,
-          errorMessage: failure.message,
-          nextStep: AuthNextStep.none,
-        ),
-      ),
-      (_) => emit(
-        state.copyWith(status: AuthStatus.success, nextStep: AuthNextStep.none),
-      ),
     );
   }
 

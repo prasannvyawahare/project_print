@@ -30,14 +30,13 @@ dependencies:
   firebase_core: ^4.1.1
   firebase_auth: ^6.1.0
   google_sign_in: ^7.2.0
-  sign_in_with_apple: ^7.0.1
   file_picker: ^10.3.2
   image_picker: ^1.1.2
   open_filex: ^4.7.0
   flutter_staggered_grid_view: ^0.7.0
   geolocator: ^13.0.2
   geocoding: ^3.0.0
-  pay: ^3.3.0
+  razorpay_flutter: ^1.4.0
   package_info_plus: ^9.0.1
 
 dev_dependencies:

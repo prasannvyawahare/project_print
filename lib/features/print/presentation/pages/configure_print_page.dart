@@ -86,7 +86,13 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
     final size = _sizes.firstWhere(
       (s) => s.name == _order.paperSize,
       orElse: () => _sizes.isEmpty
-          ? const PaperSizeOption(id: '', name: '', width: 0, height: 0, extra: 0)
+          ? const PaperSizeOption(
+              id: '',
+              name: '',
+              width: 0,
+              height: 0,
+              extra: 0,
+            )
           : _sizes.first,
     );
 
@@ -363,9 +369,7 @@ class _ConfigurePrintPageState extends State<ConfigurePrintPage> {
                       title: 'PAPER QUALITY',
                       child: _ConfigDropdown(
                         value:
-                            _qualities.any(
-                              (q) => q.name == _order.paperQuality,
-                            )
+                            _qualities.any((q) => q.name == _order.paperQuality)
                             ? _order.paperQuality
                             : null,
                         hint: 'No paper quality available',
@@ -743,9 +747,13 @@ class _RangeField extends StatelessWidget {
               keyboardType: TextInputType.number,
               onSubmitted: onSubmitted,
               onEditingComplete: () => FocusScope.of(context).unfocus(),
-              decoration: const InputDecoration(border: InputBorder.none),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 10 * compact),
+              ),
               style: TextStyle(
-                fontSize: 24 * compact,
+                fontSize: 15 * compact,
                 fontWeight: FontWeight.w700,
               ),
             ),

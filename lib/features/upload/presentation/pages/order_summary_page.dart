@@ -1,12 +1,11 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pay/pay.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/payment_config.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/storage/temporary_auth_store.dart';
 import '../../../../core/widgets/primary_action_button.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../data/datasources/order_remote_data_source.dart';
@@ -23,11 +22,14 @@ double _r(BuildContext context, double value) => value * _screenScale(context);
 
 String _money(num value) => 'Rs. ${value.toStringAsFixed(2)}';
 
-const _accent = Color(0xFF2563EB);
-const _primaryText = Color(0xFF1B1B2F);
-const _mutedText = Color(0xFF6E6A7C);
-const _success = Color(0xFF1B9E54);
-const _danger = Color(0xFFD93025);
+// Sourced from AppColors (lib/core/constants/app_constants.dart) so the
+// checkout palette is a named part of the app-wide theme, not a file-local
+// duplicate.
+const _accent = AppColors.dashboardAccent;
+const _primaryText = AppColors.dashboardPrimaryText;
+const _mutedText = AppColors.checkoutMutedText;
+const _success = AppColors.success;
+const _danger = AppColors.error;
 
 /// Demo promo codes applied entirely on the client. The discount is a fraction
 /// of the subtotal. The backend does not yet support promos, so this is
@@ -90,7 +92,6 @@ class _OrderSummaryPageState extends State<OrderSummaryPage> {
   Widget build(BuildContext context) {
     const bg = Color(0xFFF6F8FC);
     const accent = Color(0xFF3E34D3);
-    const pageBackground = Color(0xFFF5F2FA);
     const titleColor = Color(0xFF1F1F2E);
     return Scaffold(
       backgroundColor: bg,
@@ -201,9 +202,14 @@ class _SummaryContentState extends State<_SummaryContent> {
   String? _appliedCode;
   double _appliedRate = 0;
 
-  /// Google Pay configuration built once from [kGooglePayConfig]. Passed to the
-  /// [GooglePayButton] which manages the payment sheet and its result stream.
-  late final PaymentConfiguration _payConfig;
+  /// Opens the Razorpay Checkout sheet and dispatches its result to
+  /// [_onPaymentSuccess] / [_onPaymentError] / [_onExternalWallet].
+  late final Razorpay _razorpay;
+
+  /// Amount (in rupees) the currently open Checkout sheet was opened for.
+  /// Razorpay's success callback doesn't echo the amount back, so it's
+  /// stashed here at open-time and read once payment succeeds.
+  double _pendingAmount = 0;
 
   /// True once `order/checkout` has succeeded. Keeps the Pay button hidden
   /// after the order is placed.
@@ -216,33 +222,81 @@ class _SummaryContentState extends State<_SummaryContent> {
   @override
   void initState() {
     super.initState();
-    _payConfig = PaymentConfiguration.fromJsonString(kGooglePayConfig);
+    _razorpay = Razorpay()
+      ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
+      ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
+      ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
   }
 
   @override
   void dispose() {
     _promoController.dispose();
+    _razorpay.clear();
     super.dispose();
   }
 
-  /// Called by [GooglePayButton] once the Google Pay sheet completes
-  /// successfully. [result] carries the payment token under
-  /// `paymentMethodData.tokenizationData.token`; forward it to the backend
-  /// once the checkout API accepts a gateway token.
-  void _onGooglePayResult(Map<String, dynamic> result, double amountToPay) {
-    debugPrint('Google Pay result: ${jsonEncode(result)}');
-    _placeOrder(amountToPay, paymentMethod: 'GOOGLE_PAY');
+  /// Opens the Razorpay Checkout sheet for [amountToPay] (in rupees).
+  ///
+  /// No backend order id is created yet — the same level of integration as
+  /// the Google Pay button this replaces (client collects a result, then
+  /// `order/checkout` is tagged with the payment method). Move to a
+  /// server-created Razorpay order + signature verification once the
+  /// backend exposes those endpoints.
+  void _openCheckout(double amountToPay) {
+    _pendingAmount = amountToPay;
+    final mobile = sl<TemporaryAuthStore>().mobile;
+
+    final options = <String, dynamic>{
+      'key': kRazorpayKeyId,
+      'amount': (amountToPay * 100).round(),
+      'currency': 'INR',
+      'name': 'PrintHub',
+      'description': 'Order #${widget.orderId}',
+      if (mobile.isNotEmpty) 'prefill': {'contact': mobile},
+    };
+
+    try {
+      _razorpay.open(options);
+    } catch (error) {
+      debugPrint('Razorpay open failed: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Unable to open the payment sheet.')),
+        );
+    }
   }
 
-  /// Called by [GooglePayButton] when the sheet is cancelled or errors.
-  void _onGooglePayError(Object? error) {
-    debugPrint('Google Pay error: $error');
+  /// Called once the Razorpay sheet reports a successful payment.
+  void _onPaymentSuccess(PaymentSuccessResponse response) {
+    debugPrint('Razorpay payment success: ${response.paymentId}');
+    _placeOrder(_pendingAmount, paymentMethod: 'RAZORPAY');
+  }
+
+  /// Called when the Razorpay sheet is cancelled or a payment fails.
+  void _onPaymentError(PaymentFailureResponse response) {
+    debugPrint(
+      'Razorpay payment error: ${response.code} ${response.message}',
+    );
     if (!mounted) return;
-    if (error is PlatformException && error.code == 'paymentCanceled') return;
+    if (response.code == Razorpay.PAYMENT_CANCELLED) return;
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
         const SnackBar(content: Text('Payment could not be completed.')),
+      );
+  }
+
+  /// Called when the user picks an external wallet app. The result isn't
+  /// known yet at this point, so this only informs the user — it doesn't
+  /// place the order.
+  void _onExternalWallet(ExternalWalletResponse response) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(content: Text('Opening ${response.walletName ?? 'wallet'}…')),
       );
   }
 
@@ -416,12 +470,7 @@ class _SummaryContentState extends State<_SummaryContent> {
         else
           _PaymentBar(
             total: amountToPay,
-            processing: false,
-            paymentConfiguration: _payConfig,
-            onPay: () => _placeOrder(amountToPay),
-            onGooglePayResult: (result) =>
-                _onGooglePayResult(result, amountToPay),
-            onGooglePayError: _onGooglePayError,
+            onPay: () => _openCheckout(amountToPay),
           ),
       ],
     );
@@ -638,7 +687,7 @@ class _PromoField extends StatelessWidget {
               height: 52 * compact,
               child: FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F766E),
+                  backgroundColor: _accent,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14 * compact),
                   ),
@@ -929,76 +978,17 @@ class _DestinationCard extends StatelessWidget {
 }
 
 class _PaymentBar extends StatelessWidget {
-  const _PaymentBar({
-    required this.total,
-    required this.processing,
-    required this.paymentConfiguration,
-    required this.onPay,
-    required this.onGooglePayResult,
-    required this.onGooglePayError,
-  });
+  const _PaymentBar({required this.total, required this.onPay});
 
   final num total;
-  final bool processing;
-  final PaymentConfiguration paymentConfiguration;
 
-  /// Fallback pay action for platforms/devices without Google Pay.
+  /// Opens the Razorpay Checkout sheet for [total].
   final VoidCallback onPay;
-
-  /// Called with the Google Pay result once the sheet completes successfully.
-  final void Function(Map<String, dynamic> result) onGooglePayResult;
-
-  /// Called when the Google Pay sheet is cancelled or errors.
-  final void Function(Object? error) onGooglePayError;
 
   @override
   Widget build(BuildContext context) {
     final compact = _screenScale(context);
     final height = 56.0 * compact;
-
-    final fallbackButton = PrimaryActionButton(
-      label: 'Pay ${_money(total)}',
-      onPressed: onPay,
-      isLoading: processing,
-      height: height,
-      borderRadius: 30 * compact,
-      fontSize: 17 * compact,
-      iconSize: 22 * compact,
-    );
-
-    // Google Pay is Android-only in the `pay` plugin. Elsewhere, fall back to
-    // the standard button (which places the order directly).
-    final Widget payWidget = defaultTargetPlatform == TargetPlatform.android
-        ? GooglePayButton(
-            paymentConfiguration: paymentConfiguration,
-            paymentItems: [
-              PaymentItem(
-                label: 'Total',
-                amount: total.toStringAsFixed(2),
-                status: PaymentItemStatus.final_price,
-              ),
-            ],
-            type: GooglePayButtonType.pay,
-            theme: GooglePayButtonTheme.dark,
-            width: double.infinity,
-            height: height,
-            cornerRadius: (30 * compact).round(),
-            onPaymentResult: onGooglePayResult,
-            onError: onGooglePayError,
-            loadingIndicator: SizedBox(
-              height: height,
-              child: const Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-            // Shown when Google Pay isn't available so checkout stays reachable.
-            childOnError: fallbackButton,
-          )
-        : fallbackButton;
 
     return Container(
       color: Colors.white,
@@ -1008,7 +998,14 @@ class _PaymentBar extends StatelessWidget {
         18 * compact,
         16 * compact,
       ),
-      child: payWidget,
+      child: PrimaryActionButton(
+        label: 'Pay ${_money(total)}',
+        onPressed: onPay,
+        height: height,
+        borderRadius: 30 * compact,
+        fontSize: 17 * compact,
+        iconSize: 22 * compact,
+      ),
     );
   }
 }

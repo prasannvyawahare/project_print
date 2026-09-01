@@ -11,10 +11,6 @@ class AuthGoogleSignInRequested extends AuthEvent {
   const AuthGoogleSignInRequested();
 }
 
-class AuthAppleSignInRequested extends AuthEvent {
-  const AuthAppleSignInRequested();
-}
-
 class AuthManualMobileSubmitted extends AuthEvent {
   const AuthManualMobileSubmitted({required this.mobile, required this.token});
 

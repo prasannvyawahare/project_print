@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/storage/active_job_store.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
@@ -30,10 +31,13 @@ double _screenScale(BuildContext context) {
 double _r(BuildContext context, double value) => value * _screenScale(context);
 
 // ── Shared palette ─────────────────────────────────────────────────────────
-const _accent = Color(0xFF2563EB);
-const _pageBackground = Color(0xFFF6F8FC);
-const _primaryText = Color(0xFF1B1B2F);
-const _mutedText = Color(0xFF8B8B9C);
+// Sourced from AppColors (lib/core/constants/app_constants.dart) so the
+// dashboard's palette is a named part of the app-wide theme, not a
+// file-local duplicate.
+const _accent = AppColors.dashboardAccent;
+const _pageBackground = AppColors.dashboardBackground;
+const _primaryText = AppColors.dashboardPrimaryText;
+const _mutedText = AppColors.dashboardMutedText;
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -232,6 +236,7 @@ class _HomeViewState extends State<_HomeView> {
                                 ? Colors.red.shade600
                                 : _mutedText,
                             fontSize: _r(context, 15),
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         SizedBox(height: _r(context, 18)),
@@ -347,6 +352,7 @@ class _HomeViewState extends State<_HomeView> {
                               mobile,
                               style: const TextStyle(
                                 fontSize: 13,
+                                fontWeight: FontWeight.w500,
                                 color: _mutedText,
                               ),
                             ),
@@ -684,6 +690,7 @@ class _ServiceTile extends StatelessWidget {
                 style: TextStyle(
                   color: _mutedText,
                   fontSize: 11.5 * compact,
+                  fontWeight: FontWeight.w500,
                   height: 1.25,
                 ),
               ),
@@ -732,7 +739,11 @@ class _NoActiveJobs extends StatelessWidget {
           Text(
             'Start a print order and it will show up here.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: _mutedText, fontSize: 12 * compact),
+            style: TextStyle(
+              color: _mutedText,
+              fontSize: 12 * compact,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
