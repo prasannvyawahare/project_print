@@ -15,6 +15,19 @@ class AuthAppleSignInRequested extends AuthEvent {
   const AuthAppleSignInRequested();
 }
 
+class AuthEmailPasswordSignInRequested extends AuthEvent {
+  const AuthEmailPasswordSignInRequested({
+    required this.email,
+    required this.password,
+  });
+
+  final String email;
+  final String password;
+
+  @override
+  List<Object?> get props => [email, password];
+}
+
 class AuthManualMobileSubmitted extends AuthEvent {
   const AuthManualMobileSubmitted({required this.mobile, required this.token});
 

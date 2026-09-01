@@ -41,6 +41,39 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, AuthUserEntity>> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    final hasConnection = await _networkInfo.isConnected;
+    if (!hasConnection) {
+      return const Left(ConnectionFailure('No internet connection'));
+    }
+
+    try {
+      final user = await _remoteDataSource.signInWithEmailPassword(
+        email: email,
+        password: password,
+      );
+      return Right(user);
+    } on ServerException catch (error, stackTrace) {
+      _logger.e(
+        'Email auth server exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return Left(ServerFailure(error.message, statusCode: error.statusCode));
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Email auth unknown exception',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const Left(ServerFailure('Authentication failed'));
+    }
+  }
+
+  @override
   Future<Either<Failure, String>> verifyAndSaveUser({
     required String email,
     required String mobile,

@@ -29,6 +29,10 @@ class AppConstants {
       'Your high-speed print station is one tap away';
   static const String continueWithGoogle = 'Continue with Google';
   static const String continueWithApple = 'Continue with Apple';
+  static const String continueWithEmail = 'Continue with Email';
+  static const String orDivider = 'OR';
+  static const String emailLabel = 'Email';
+  static const String passwordLabel = 'Password';
   static const String login = 'Login';
   static const String register = 'Register';
   static const String authFooter = 'PRECISION IN EVERY PIXEL';

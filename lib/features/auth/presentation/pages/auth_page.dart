@@ -17,6 +17,28 @@ class AuthPage extends StatefulWidget {
 
 class _AuthPageState extends State<AuthPage> {
   bool _isMobileDialogOpen = false;
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final GlobalKey<FormState> _emailFormKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _submitEmailPassword(BuildContext context) {
+    if (_emailFormKey.currentState?.validate() ?? false) {
+      context.read<AuthBloc>().add(
+        AuthEmailPasswordSignInRequested(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,85 +323,124 @@ class _AuthPageState extends State<AuthPage> {
                                 SizedBox(
                                   height: AppDimensions.spacing56 * scale,
                                 ),
+                                Row(
+                                  children: [
+                                    const Expanded(child: Divider()),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal:
+                                            AppDimensions.spacing8 * scale,
+                                      ),
+                                      child: Text(
+                                        AppConstants.orDivider,
+                                        style: TextStyle(
+                                          color: AppColors.footerText,
+                                          fontSize: subtitleSize * 0.7,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    const Expanded(child: Divider()),
+                                  ],
+                                ),
+                                SizedBox(height: AppDimensions.spacing10 * scale),
+                                Form(
+                                  key: _emailFormKey,
+                                  child: Column(
+                                    children: [
+                                      TextFormField(
+                                        controller: _emailController,
+                                        enabled: !isSigningIn,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        textInputAction: TextInputAction.next,
+                                        decoration: const InputDecoration(
+                                          labelText: AppConstants.emailLabel,
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        validator: (value) {
+                                          final trimmed = value?.trim() ?? '';
+                                          if (trimmed.isEmpty ||
+                                              !trimmed.contains('@')) {
+                                            return 'Enter a valid email';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                      SizedBox(
+                                        height: AppDimensions.spacing10 * scale,
+                                      ),
+                                      TextFormField(
+                                        controller: _passwordController,
+                                        enabled: !isSigningIn,
+                                        obscureText: _obscurePassword,
+                                        textInputAction: TextInputAction.done,
+                                        decoration: InputDecoration(
+                                          labelText:
+                                              AppConstants.passwordLabel,
+                                          border:
+                                              const OutlineInputBorder(),
+                                          suffixIcon: IconButton(
+                                            icon: Icon(
+                                              _obscurePassword
+                                                  ? Icons.visibility_off
+                                                  : Icons.visibility,
+                                            ),
+                                            onPressed: () => setState(
+                                              () => _obscurePassword =
+                                                  !_obscurePassword,
+                                            ),
+                                          ),
+                                        ),
+                                        validator: (value) {
+                                          if ((value ?? '').length < 6) {
+                                            return 'Minimum 6 characters';
+                                          }
+                                          return null;
+                                        },
+                                        onFieldSubmitted: (_) => isSigningIn
+                                            ? null
+                                            : _submitEmailPassword(context),
+                                      ),
+                                      SizedBox(
+                                        height: AppDimensions.spacing10 * scale,
+                                      ),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton(
+                                          onPressed: isSigningIn
+                                              ? null
+                                              : () =>
+                                                    _submitEmailPassword(
+                                                      context,
+                                                    ),
+                                          style: ElevatedButton.styleFrom(
+                                            minimumSize: Size.fromHeight(
+                                              socialButtonHeight,
+                                            ),
+                                            backgroundColor:
+                                                AppColors.brandBlue,
+                                            foregroundColor: AppColors.white,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    AppDimensions.radius46,
+                                                  ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            AppConstants.continueWithEmail,
+                                            style: TextStyle(
+                                              fontSize: socialTextSize,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 const Spacer(),
-                                // Row(
-                                //   children: [
-                                //     Expanded(
-                                //       child: OutlinedButton(
-                                //         onPressed: isSigningIn
-                                //             ? null
-                                //             : () => _continue(context),
-                                //         style: OutlinedButton.styleFrom(
-                                //           minimumSize: Size.fromHeight(
-                                //             (AppDimensions.spacing46 * scale)
-                                //                 .clamp(
-                                //                   AppDimensions.spacing40,
-                                //                   AppDimensions.spacing46,
-                                //                 ),
-                                //           ),
-                                //           side: const BorderSide(
-                                //             color: AppColors.brandBlue,
-                                //           ),
-                                //           shape: RoundedRectangleBorder(
-                                //             borderRadius: BorderRadius.circular(
-                                //               AppDimensions.radius18,
-                                //             ),
-                                //           ),
-                                //         ),
-                                //         child: Text(
-                                //           AppConstants.login,
-                                //           style: TextStyle(
-                                //             fontSize:
-                                //                 (AppDimensions.spacing16 *
-                                //                         scale)
-                                //                     .clamp(
-                                //                       AppDimensions.spacing14,
-                                //                       AppDimensions.spacing16,
-                                //                     ),
-                                //           ),
-                                //         ),
-                                //       ),
-                                //     ),
-                                //     SizedBox(
-                                //       width: AppDimensions.spacing10 * scale,
-                                //     ),
-                                //     Expanded(
-                                //       child: ElevatedButton(
-                                //         onPressed: isSigningIn
-                                //             ? null
-                                //             : () => _continue(context),
-                                //         style: ElevatedButton.styleFrom(
-                                //           minimumSize: Size.fromHeight(
-                                //             (AppDimensions.spacing46 * scale)
-                                //                 .clamp(
-                                //                   AppDimensions.spacing40,
-                                //                   AppDimensions.spacing46,
-                                //                 ),
-                                //           ),
-                                //           backgroundColor: AppColors.brandBlue,
-                                //           foregroundColor: AppColors.white,
-                                //           shape: RoundedRectangleBorder(
-                                //             borderRadius: BorderRadius.circular(
-                                //               AppDimensions.radius18,
-                                //             ),
-                                //           ),
-                                //         ),
-                                //         child: Text(
-                                //           AppConstants.register,
-                                //           style: TextStyle(
-                                //             fontSize:
-                                //                 (AppDimensions.spacing16 *
-                                //                         scale)
-                                //                     .clamp(
-                                //                       AppDimensions.spacing14,
-                                //                       AppDimensions.spacing16,
-                                //                     ),
-                                //           ),
-                                //         ),
-                                //       ),
-                                //     ),
-                                //   ],
-                                // ),
                                 Center(
                                   child: Column(
                                     children: [

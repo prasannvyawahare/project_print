@@ -12,6 +12,10 @@ import '../models/auth_user_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<AuthUserModel> signInWithGoogle();
+  Future<AuthUserModel> signInWithEmailPassword({
+    required String email,
+    required String password,
+  });
   Future<String> verifyAndSaveUser({
     required String email,
     required String mobile,
@@ -189,6 +193,75 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       _logger.e('Google sign-in error', error: error, stackTrace: stackTrace);
 
       throw ServerException(message: 'Unable to sign in with Google');
+    }
+  }
+
+  /// Email/password sign-in for testing without the Google/Apple OAuth
+  /// consent screen. Auto-creates the account on first use since this app
+  /// has no separate sign-up flow.
+  @override
+  Future<AuthUserModel> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      UserCredential userCredential;
+      try {
+        userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      } on FirebaseAuthException catch (error) {
+        if (error.code == 'user-not-found') {
+          userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+            email: email,
+            password: password,
+          );
+        } else {
+          rethrow;
+        }
+      }
+
+      final user = userCredential.user;
+      if (user == null) {
+        throw ServerException(message: 'Firebase user not available.');
+      }
+
+      final String? firebaseIdToken = await user.getIdToken(true);
+      if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+        throw ServerException(message: 'Failed to retrieve Firebase ID token.');
+      }
+
+      await _temporaryAuthStore.save(
+        mobile: user.phoneNumber?.trim() ?? '',
+        token: firebaseIdToken,
+        displayName: user.displayName ?? '',
+      );
+
+      return AuthUserModel(
+        email: user.email ?? email,
+        displayName: user.displayName ?? '',
+        mobile: user.phoneNumber,
+        authToken: firebaseIdToken,
+      );
+    } on ServerException {
+      rethrow;
+    } on FirebaseAuthException catch (error) {
+      _logger.e(
+        'Email/password auth error',
+        error: error,
+        stackTrace: error.stackTrace,
+      );
+      throw ServerException(message: error.message ?? 'Authentication failed');
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Email/password sign-in error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      throw ServerException(
+        message: 'Unable to sign in with email and password',
+      );
     }
   }
 
