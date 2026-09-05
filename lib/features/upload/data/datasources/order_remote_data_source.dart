@@ -28,6 +28,11 @@ abstract class OrderRemoteDataSource {
   /// `DELETE order/cancel`.
   Future<void> cancelOrder({required String orderId});
 
+  /// Fetches `{orderStatus, paymentStatus, paymentMethod}` for [orderId].
+  /// Backed by `GET order/<orderId>/status` — the authoritative source for
+  /// whether a UPI payment has been confirmed by the Razorpay webhook.
+  Future<OrderStatusResult> getOrderStatus({required String orderId});
+
   /// Notifies the backend that a file's Drive upload finished, so it can
   /// finalize the item. Called once per file after its `uploadUrl` PUT succeeds.
   ///
@@ -270,6 +275,40 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   }
 
   @override
+  Future<OrderStatusResult> getOrderStatus({required String orderId}) async {
+    if (orderId.isEmpty) {
+      throw const OrderCreateException('Missing order ID for status check.');
+    }
+
+    try {
+      final response = await _dioClient.get(
+        path: ApiConstants.orderStatus(orderId),
+      );
+
+      final responseData = response.data;
+      final responseMap = responseData is Map<String, dynamic>
+          ? responseData
+          : const <String, dynamic>{};
+      final data = responseMap['data'] is Map<String, dynamic>
+          ? responseMap['data'] as Map<String, dynamic>
+          : const <String, dynamic>{};
+
+      return OrderStatusResult.fromJson(data);
+    } on DioException catch (error, stackTrace) {
+      _logger.e('Order status fetch failed', error: error, stackTrace: stackTrace);
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to fetch order status.',
+      );
+    }
+  }
+
+  @override
   Future<void> completeUpload({
     required String itemId,
     required String driveFileId,
@@ -423,6 +462,7 @@ class OrderCheckoutResult {
     required this.paymentMethod,
     required this.grandTotal,
     required this.message,
+    required this.razorpayOrderId,
   });
 
   factory OrderCheckoutResult.fromJson(
@@ -433,8 +473,11 @@ class OrderCheckoutResult {
       orderId: (json['orderId'] as String?) ?? '',
       status: (json['status'] as String?) ?? (json['orderStatus'] as String?) ?? '',
       paymentMethod: (json['paymentMethod'] as String?) ?? '',
-      grandTotal: (json['grandTotal'] as num?) ?? 0,
+      grandTotal: (json['grandTotal'] as num?) ?? (json['totalAmount'] as num?) ?? 0,
       message: message ?? json['message']?.toString() ?? '',
+      // Only present for UPI checkout — the Razorpay order id to open the
+      // Checkout sheet with, so the webhook can trace payment back to us.
+      razorpayOrderId: json['razorpayOrderId'] as String?,
     );
   }
 
@@ -443,6 +486,31 @@ class OrderCheckoutResult {
   final String paymentMethod;
   final num grandTotal;
   final String message;
+  final String? razorpayOrderId;
+}
+
+/// Parsed `data` payload returned by `GET order/<orderId>/status`.
+class OrderStatusResult {
+  const OrderStatusResult({
+    required this.orderId,
+    required this.orderStatus,
+    required this.paymentStatus,
+    required this.paymentMethod,
+  });
+
+  factory OrderStatusResult.fromJson(Map<String, dynamic> json) {
+    return OrderStatusResult(
+      orderId: (json['orderId'] as String?) ?? '',
+      orderStatus: (json['orderStatus'] as String?) ?? '',
+      paymentStatus: (json['paymentStatus'] as String?) ?? '',
+      paymentMethod: json['paymentMethod'] as String?,
+    );
+  }
+
+  final String orderId;
+  final String orderStatus;
+  final String paymentStatus;
+  final String? paymentMethod;
 }
 
 class OrderCreateException implements Exception {

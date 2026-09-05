@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -206,18 +208,14 @@ class _SummaryContentState extends State<_SummaryContent> {
   /// [_onPaymentSuccess] / [_onPaymentError] / [_onExternalWallet].
   late final Razorpay _razorpay;
 
-  /// Amount (in rupees) the currently open Checkout sheet was opened for.
-  /// Razorpay's success callback doesn't echo the amount back, so it's
-  /// stashed here at open-time and read once payment succeeds.
-  double _pendingAmount = 0;
-
   /// True once `order/checkout` has succeeded. Keeps the Pay button hidden
   /// after the order is placed.
   bool _orderPlaced = false;
 
-  /// Controls the "Placing your order…" progress bar. Shown while checkout is
-  /// in flight and for 2s after success, then hidden.
+  /// Controls the progress bar shown in place of the Pay button while a
+  /// checkout/payment step is in flight. [_placingLabel] controls its text.
   bool _showPlacingBar = false;
+  String _placingLabel = 'Placing your order…';
 
   @override
   void initState() {
@@ -235,19 +233,66 @@ class _SummaryContentState extends State<_SummaryContent> {
     super.dispose();
   }
 
-  /// Opens the Razorpay Checkout sheet for [amountToPay] (in rupees).
-  ///
-  /// No backend order id is created yet — the same level of integration as
-  /// the Google Pay button this replaces (client collects a result, then
-  /// `order/checkout` is tagged with the payment method). Move to a
-  /// server-created Razorpay order + signature verification once the
-  /// backend exposes those endpoints.
-  void _openCheckout(double amountToPay) {
-    _pendingAmount = amountToPay;
+  /// Calls `order/checkout` for UPI first — this is what creates the
+  /// server-side Razorpay order and moves the order to `PAYMENT_PENDING` —
+  /// then opens the Checkout sheet with that order's id attached, so the
+  /// Razorpay webhook can trace the eventual payment back to this order.
+  Future<void> _startRazorpayCheckout(double amountToPay) async {
+    final addressId = widget.addressId;
+    if (addressId == null || addressId.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Please select a delivery address.')),
+        );
+      return;
+    }
+
+    setState(() {
+      _placingLabel = 'Creating your order…';
+      _showPlacingBar = true;
+    });
+
+    try {
+      final result = await sl<OrderRemoteDataSource>().checkout(
+        orderId: widget.orderId,
+        addressId: addressId,
+        paymentMethod: 'UPI',
+      );
+      final razorpayOrderId = result.razorpayOrderId;
+      if (razorpayOrderId == null || razorpayOrderId.isEmpty) {
+        throw const OrderCreateException(
+          'Payment could not be initiated. Please try again.',
+        );
+      }
+      if (!mounted) return;
+      setState(() => _showPlacingBar = false);
+      _openCheckout(amountToPay, razorpayOrderId: razorpayOrderId);
+    } on OrderCreateException catch (error) {
+      if (!mounted) return;
+      setState(() => _showPlacingBar = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _showPlacingBar = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Failed to start payment.')),
+        );
+    }
+  }
+
+  /// Opens the Razorpay Checkout sheet for [amountToPay] (in rupees) against
+  /// the server-created [razorpayOrderId].
+  void _openCheckout(double amountToPay, {required String razorpayOrderId}) {
     final mobile = sl<TemporaryAuthStore>().mobile;
 
     final options = <String, dynamic>{
       'key': kRazorpayKeyId,
+      'order_id': razorpayOrderId,
       'amount': (amountToPay * 100).round(),
       'currency': 'INR',
       'name': 'PrintHub',
@@ -268,13 +313,23 @@ class _SummaryContentState extends State<_SummaryContent> {
     }
   }
 
-  /// Called once the Razorpay sheet reports a successful payment.
+  /// Called once the Razorpay sheet reports a successful payment. This is
+  /// only a client-side hint, not confirmation — the order is already
+  /// `PAYMENT_PENDING` from checkout, and only the Razorpay webhook actually
+  /// flips it to paid. Poll the order status until that lands.
   void _onPaymentSuccess(PaymentSuccessResponse response) {
     debugPrint('Razorpay payment success: ${response.paymentId}');
-    _placeOrder(_pendingAmount, paymentMethod: 'RAZORPAY');
+    if (!mounted) return;
+    setState(() {
+      _placingLabel = 'Confirming your payment…';
+      _showPlacingBar = true;
+    });
+    unawaited(_pollPaymentStatus());
   }
 
-  /// Called when the Razorpay sheet is cancelled or a payment fails.
+  /// Called when the Razorpay sheet is cancelled or a payment fails
+  /// client-side. Purely informational: the order stays `PAYMENT_PENDING`
+  /// (retryable) until either a webhook confirms it or nothing ever arrives.
   void _onPaymentError(PaymentFailureResponse response) {
     debugPrint(
       'Razorpay payment error: ${response.code} ${response.message}',
@@ -300,62 +355,71 @@ class _SummaryContentState extends State<_SummaryContent> {
       );
   }
 
-  Future<void> _placeOrder(
-    double amountToPay, {
-    String paymentMethod = 'COD',
-  }) async {
-    final addressId = widget.addressId;
-    if (addressId == null || addressId.isEmpty) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('Please select a delivery address.')),
+  /// Polls `GET order/<orderId>/status` until the Razorpay webhook has moved
+  /// the order out of `PAYMENT_PENDING` (or we give up after ~1 minute).
+  /// This — not the Razorpay client callback — is what actually confirms
+  /// "payment complete, ready for print" to the user.
+  Future<void> _pollPaymentStatus() async {
+    const maxAttempts = 30;
+    const interval = Duration(seconds: 2);
+
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      await Future<void>.delayed(interval);
+      if (!mounted) return;
+
+      try {
+        final status = await sl<OrderRemoteDataSource>().getOrderStatus(
+          orderId: widget.orderId,
         );
-      return;
+
+        if (status.orderStatus == 'PAYMENT_FAILED') {
+          setState(() => _showPlacingBar = false);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text('Payment failed. Please try again.'),
+              ),
+            );
+          return;
+        }
+
+        if (status.orderStatus != 'PAYMENT_PENDING') {
+          // Webhook landed: order moved on to PENDING_ACCEPTANCE (or beyond).
+          setState(() {
+            _showPlacingBar = false;
+            _orderPlaced = true;
+          });
+          if (!mounted) return;
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Payment complete — your order is ready for print!',
+                ),
+              ),
+            );
+          return;
+        }
+      } catch (_) {
+        // Transient network hiccup — keep polling rather than giving up on
+        // a single failed check.
+      }
     }
 
-    setState(() => _showPlacingBar = true);
-    try {
-      final result = await sl<OrderRemoteDataSource>().checkout(
-        orderId: widget.orderId,
-        addressId: addressId,
-        paymentMethod: paymentMethod,
-      );
-      if (!mounted) return;
-      // Stay on this screen and just hide the Pay button. The post-checkout
-      // flow (confirmation / navigation) will be implemented later.
-      setState(() => _orderPlaced = true);
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              result.message.isNotEmpty
-                  ? result.message
-                  : 'Order placed successfully.',
-            ),
+    if (!mounted) return;
+    setState(() => _showPlacingBar = false);
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Still confirming your payment — we'll update your order shortly.",
           ),
-        );
-      // Keep the progress bar up briefly after success, then hide it.
-      Future<void>.delayed(const Duration(seconds: 2), () {
-        if (mounted) setState(() => _showPlacingBar = false);
-      });
-    } on OrderCreateException catch (error) {
-      if (!mounted) return;
-      // Restore the Pay button so the user can retry.
-      setState(() => _showPlacingBar = false);
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(error.message)));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _showPlacingBar = false);
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('Failed to place the order.')),
-        );
-    }
+        ),
+      );
   }
 
   void _applyPromo() {
@@ -464,23 +528,26 @@ class _SummaryContentState extends State<_SummaryContent> {
         // While checkout runs (and for 2s after success) show the progress bar.
         // Once placed, the Pay button stays hidden (empty bottom area).
         if (_showPlacingBar)
-          const _PlacingOrderBar()
+          _PlacingOrderBar(label: _placingLabel)
         else if (_orderPlaced)
           const SizedBox.shrink()
         else
           _PaymentBar(
             total: amountToPay,
-            onPay: () => _openCheckout(amountToPay),
+            onPay: () => _startRazorpayCheckout(amountToPay),
           ),
       ],
     );
   }
 }
 
-/// Bottom bar shown while `order/checkout` is in flight, replacing the Pay
-/// button so it can't be tapped again.
+/// Bottom bar shown while `order/checkout` is in flight (or while polling for
+/// webhook confirmation after Razorpay success), replacing the Pay button so
+/// it can't be tapped again.
 class _PlacingOrderBar extends StatelessWidget {
-  const _PlacingOrderBar();
+  const _PlacingOrderBar({this.label = 'Placing your order…'});
+
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -508,7 +575,7 @@ class _PlacingOrderBar extends StatelessWidget {
             ),
             SizedBox(width: 12 * compact),
             Text(
-              'Placing your order…',
+              label,
               style: TextStyle(
                 color: _primaryText,
                 fontSize: 16 * compact,

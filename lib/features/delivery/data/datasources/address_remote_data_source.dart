@@ -32,6 +32,21 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
   final DioClient _dioClient;
   final Logger _logger;
 
+  /// Backend validation errors (400s) come back as `{message: "..."}` (or
+  /// occasionally `{error: "..."}`) — surface that instead of Dio's generic
+  /// "Http status error [400]" so the SnackBar tells the user what actually
+  /// failed (e.g. an invalid pincode or a missing field).
+  String _backendMessage(DioException error) {
+    final data = error.response?.data;
+    final backendMessage = data is Map<String, dynamic>
+        ? (data['message']?.toString() ?? data['error']?.toString())
+        : null;
+    if (backendMessage != null && backendMessage.trim().isNotEmpty) {
+      return backendMessage;
+    }
+    return error.message ?? 'Unexpected network error';
+  }
+
   @override
   Future<AddressModel> createAddress({
     required String addressType,
@@ -61,7 +76,7 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
     } on DioException catch (error) {
       _logger.e('Dio error', error: error, stackTrace: error.stackTrace);
       throw ServerException(
-        message: error.message ?? 'Unexpected network error',
+        message: _backendMessage(error),
         statusCode: error.response?.statusCode,
       );
     }
@@ -87,7 +102,7 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
     } on DioException catch (error) {
       _logger.e('Dio error', error: error, stackTrace: error.stackTrace);
       throw ServerException(
-        message: error.message ?? 'Unexpected network error',
+        message: _backendMessage(error),
         statusCode: error.response?.statusCode,
       );
     }
@@ -113,7 +128,7 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
     } on DioException catch (error) {
       _logger.e('Dio error', error: error, stackTrace: error.stackTrace);
       throw ServerException(
-        message: error.message ?? 'Unexpected network error',
+        message: _backendMessage(error),
         statusCode: error.response?.statusCode,
       );
     }
@@ -139,7 +154,7 @@ class AddressRemoteDataSourceImpl implements AddressRemoteDataSource {
     } on DioException catch (error) {
       _logger.e('Dio error', error: error, stackTrace: error.stackTrace);
       throw ServerException(
-        message: error.message ?? 'Unexpected network error',
+        message: _backendMessage(error),
         statusCode: error.response?.statusCode,
       );
     }

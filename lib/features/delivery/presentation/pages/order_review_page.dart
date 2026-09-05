@@ -269,6 +269,25 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                 context,
               ).showSnackBar(SnackBar(content: Text(state.error)));
             }
+            // Exactly one saved address: skip the manual-tap requirement and
+            // preselect it automatically so the user can proceed straight
+            // away. With 2+ addresses we leave the choice to the user instead
+            // (see the `selected:` check below, which no longer falls back to
+            // the backend's `selected` flag).
+            if (state.status == AddressStatus.success &&
+                _selectedAddressId == null &&
+                state.addresses.length == 1) {
+              final only = state.addresses.first;
+              setState(() {
+                _selectedAddressId = only.id;
+                _selectedAddress = only;
+              });
+              if (!only.selected) {
+                context.read<AddressBloc>().add(
+                  AddressSelectRequested(addressId: only.id),
+                );
+              }
+            }
           },
           child: Scaffold(
             backgroundColor: const Color(0xFFF6F8FC),
@@ -345,10 +364,14 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                                     _AddressCard(
                                       entity: addr,
                                       icon: _iconForType(addr.addressType),
-                                      selected:
-                                          (_selectedAddressId == null &&
-                                              addr.selected) ||
-                                          _selectedAddressId == addr.id,
+                                      // Only the address the user (or the
+                                      // single-address auto-select above) has
+                                      // actually chosen shows the highlighted
+                                      // border/radio — never pre-highlight
+                                      // just because the backend happens to
+                                      // flag one as `selected` while multiple
+                                      // addresses are on screen.
+                                      selected: _selectedAddressId == addr.id,
                                       onTap: () {
                                         if (_selectedAddressId == addr.id) {
                                           return;

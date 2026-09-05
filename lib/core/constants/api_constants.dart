@@ -26,6 +26,11 @@ class ApiConstants {
   static String orderItemUploadComplete(String itemId) =>
       'order/items/$itemId/upload-complete';
 
+  /// Polls `{orderStatus, paymentStatus, paymentMethod}` for [orderId].
+  /// Used to confirm a UPI payment once the Razorpay webhook has landed,
+  /// since the client-side Checkout callback is not authoritative.
+  static String orderStatus(String orderId) => 'order/$orderId/status';
+
   // Keep existing demo endpoint working with an absolute URL.
   static const String welcomePath =
       'https://jsonplaceholder.typicode.com/posts/1';
