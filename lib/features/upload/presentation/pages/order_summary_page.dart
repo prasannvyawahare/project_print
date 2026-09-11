@@ -217,6 +217,16 @@ class _SummaryContentState extends State<_SummaryContent> {
   bool _showPlacingBar = false;
   String _placingLabel = 'Placing your order…';
 
+  /// The server-created Razorpay order currently open in the Checkout sheet.
+  /// Needed by [_verifyPayment] to confirm the signature against the right
+  /// order, and refreshed by [_retryPayment] when payment is retried.
+  String? _razorpayOrderId;
+
+  /// True once a payment attempt has been confirmed as failed (client-side
+  /// error or a `PAYMENT_FAILED` status). Swaps the Pay button for a Retry
+  /// Payment button backed by `payment/retry`.
+  bool _paymentFailed = false;
+
   @override
   void initState() {
     super.initState();
@@ -251,20 +261,33 @@ class _SummaryContentState extends State<_SummaryContent> {
     setState(() {
       _placingLabel = 'Creating your order…';
       _showPlacingBar = true;
+      _paymentFailed = false;
     });
 
     try {
-      final result = await sl<OrderRemoteDataSource>().checkout(
-        orderId: widget.orderId,
-        addressId: addressId,
-        paymentMethod: 'UPI',
-      );
-      final razorpayOrderId = result.razorpayOrderId;
+      String? razorpayOrderId;
+      try {
+        final result = await sl<OrderRemoteDataSource>().checkout(
+          orderId: widget.orderId,
+          addressId: addressId,
+          paymentMethod: 'UPI',
+        );
+        razorpayOrderId = result.razorpayOrderId;
+        if ((razorpayOrderId == null || razorpayOrderId.isEmpty) &&
+            _isAlreadyInitiated(result.message)) {
+          razorpayOrderId = await _fetchRetryRazorpayOrderId();
+        }
+      } on OrderCreateException catch (error) {
+        if (!_isAlreadyInitiated(error.message)) rethrow;
+        razorpayOrderId = await _fetchRetryRazorpayOrderId();
+      }
+
       if (razorpayOrderId == null || razorpayOrderId.isEmpty) {
         throw const OrderCreateException(
           'Payment could not be initiated. Please try again.',
         );
       }
+      _razorpayOrderId = razorpayOrderId;
       if (!mounted) return;
       setState(() => _showPlacingBar = false);
       _openCheckout(amountToPay, razorpayOrderId: razorpayOrderId);
@@ -313,10 +336,11 @@ class _SummaryContentState extends State<_SummaryContent> {
     }
   }
 
-  /// Called once the Razorpay sheet reports a successful payment. This is
-  /// only a client-side hint, not confirmation — the order is already
-  /// `PAYMENT_PENDING` from checkout, and only the Razorpay webhook actually
-  /// flips it to paid. Poll the order status until that lands.
+  /// Called once the Razorpay sheet reports a successful payment. Verifies
+  /// the signature against `payment/verify` — the authoritative confirmation
+  /// — and falls back to polling `order/<id>/status` only if that call
+  /// itself fails (e.g. a network hiccup), since the webhook is still a
+  /// valid second source of truth.
   void _onPaymentSuccess(PaymentSuccessResponse response) {
     debugPrint('Razorpay payment success: ${response.paymentId}');
     if (!mounted) return;
@@ -324,23 +348,140 @@ class _SummaryContentState extends State<_SummaryContent> {
       _placingLabel = 'Confirming your payment…';
       _showPlacingBar = true;
     });
-    unawaited(_pollPaymentStatus());
+    unawaited(_verifyPayment(response));
+  }
+
+  /// Confirms [response]'s Razorpay signature with the backend via
+  /// `POST payment/verify`.
+  Future<void> _verifyPayment(PaymentSuccessResponse response) async {
+    final razorpayOrderId = _razorpayOrderId;
+    final paymentId = response.paymentId;
+    final signature = response.signature;
+
+    if (razorpayOrderId == null || paymentId == null || signature == null) {
+      unawaited(_pollPaymentStatus());
+      return;
+    }
+
+    try {
+      final status = await sl<OrderRemoteDataSource>().verifyPayment(
+        orderId: widget.orderId,
+        razorpayOrderId: razorpayOrderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: signature,
+      );
+      if (!mounted) return;
+
+      if (status.orderStatus == 'PAYMENT_FAILED') {
+        setState(() {
+          _showPlacingBar = false;
+          _paymentFailed = true;
+        });
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text('Payment failed. Please try again.'),
+            ),
+          );
+        return;
+      }
+
+      setState(() {
+        _showPlacingBar = false;
+        _orderPlaced = true;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Payment complete — your order is ready for print!',
+            ),
+          ),
+        );
+    } catch (_) {
+      // Verification call itself failed (network/etc) — fall back to
+      // polling for the webhook-confirmed status instead of assuming failure.
+      unawaited(_pollPaymentStatus());
+    }
   }
 
   /// Called when the Razorpay sheet is cancelled or a payment fails
-  /// client-side. Purely informational: the order stays `PAYMENT_PENDING`
-  /// (retryable) until either a webhook confirms it or nothing ever arrives.
+  /// client-side. The order stays `PAYMENT_PENDING`, so surface the Retry
+  /// Payment button (backed by `payment/retry`) rather than leaving the
+  /// user stuck.
   void _onPaymentError(PaymentFailureResponse response) {
     debugPrint(
       'Razorpay payment error: ${response.code} ${response.message}',
     );
     if (!mounted) return;
     if (response.code == Razorpay.PAYMENT_CANCELLED) return;
+    setState(() => _paymentFailed = true);
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
         const SnackBar(content: Text('Payment could not be completed.')),
       );
+  }
+
+  /// True when the backend rejected `checkout`/`payment/verify` because a
+  /// Razorpay order for this order already exists — the response doesn't
+  /// hand that id back, so it has to be fetched via `payment/retry` instead.
+  bool _isAlreadyInitiated(String message) =>
+      message.toLowerCase().contains('already initiated');
+
+  /// Fetches the current (or a fresh) Razorpay order id via
+  /// `POST payment/retry`, without touching the placing-bar/error UI state —
+  /// callers own that.
+  Future<String?> _fetchRetryRazorpayOrderId() async {
+    final result = await sl<OrderRemoteDataSource>().retryPayment(
+      orderId: widget.orderId,
+    );
+    return result.razorpayOrderId;
+  }
+
+  /// Restarts payment via `POST payment/retry`, then reopens the Checkout
+  /// sheet with the fresh Razorpay order it returns.
+  Future<void> _retryPayment(double amountToPay) async {
+    setState(() {
+      _paymentFailed = false;
+      _placingLabel = 'Retrying payment…';
+      _showPlacingBar = true;
+    });
+
+    try {
+      final razorpayOrderId = await _fetchRetryRazorpayOrderId();
+      if (razorpayOrderId == null || razorpayOrderId.isEmpty) {
+        throw const OrderCreateException(
+          'Payment could not be restarted. Please try again.',
+        );
+      }
+      _razorpayOrderId = razorpayOrderId;
+      if (!mounted) return;
+      setState(() => _showPlacingBar = false);
+      _openCheckout(amountToPay, razorpayOrderId: razorpayOrderId);
+    } on OrderCreateException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _showPlacingBar = false;
+        _paymentFailed = true;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _showPlacingBar = false;
+        _paymentFailed = true;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Failed to restart payment.')),
+        );
+    }
   }
 
   /// Called when the user picks an external wallet app. The result isn't
@@ -373,7 +514,10 @@ class _SummaryContentState extends State<_SummaryContent> {
         );
 
         if (status.orderStatus == 'PAYMENT_FAILED') {
-          setState(() => _showPlacingBar = false);
+          setState(() {
+            _showPlacingBar = false;
+            _paymentFailed = true;
+          });
           if (!mounted) return;
           ScaffoldMessenger.of(context)
             ..clearSnackBars()
@@ -531,6 +675,8 @@ class _SummaryContentState extends State<_SummaryContent> {
           _PlacingOrderBar(label: _placingLabel)
         else if (_orderPlaced)
           const SizedBox.shrink()
+        else if (_paymentFailed)
+          _RetryPaymentBar(onRetry: () => _retryPayment(amountToPay))
         else
           _PaymentBar(
             total: amountToPay,
@@ -1068,6 +1214,38 @@ class _PaymentBar extends StatelessWidget {
       child: PrimaryActionButton(
         label: 'Pay ${_money(total)}',
         onPressed: onPay,
+        height: height,
+        borderRadius: 30 * compact,
+        fontSize: 17 * compact,
+        iconSize: 22 * compact,
+      ),
+    );
+  }
+}
+
+/// Bottom bar shown in place of the Pay button once a payment attempt has
+/// failed. Backed by `payment/retry`.
+class _RetryPaymentBar extends StatelessWidget {
+  const _RetryPaymentBar({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    final height = 56.0 * compact;
+
+    return Container(
+      color: Colors.white,
+      padding: EdgeInsets.fromLTRB(
+        18 * compact,
+        12 * compact,
+        18 * compact,
+        16 * compact,
+      ),
+      child: PrimaryActionButton(
+        label: 'Retry Payment',
+        onPressed: onRetry,
         height: height,
         borderRadius: 30 * compact,
         fontSize: 17 * compact,

@@ -21,6 +21,15 @@ class ApiConstants {
   static const String orderCheckout = 'order/checkout';
   static const String orderCancel = 'order/cancel';
 
+  /// Verifies a Razorpay payment signature server-side after the Checkout
+  /// sheet reports success. Backed by `POST payment/verify`.
+  static const String paymentVerify = 'payment/verify';
+
+  /// Restarts payment for an order stuck in `PAYMENT_FAILED`/`PAYMENT_PENDING`,
+  /// returning a fresh Razorpay order to reopen the Checkout sheet with.
+  /// Backed by `POST payment/retry`.
+  static const String paymentRetry = 'payment/retry';
+
   /// Finalizes a single order item after its Drive upload PUT succeeds.
   /// [itemId] comes from the `order/create` response.
   static String orderItemUploadComplete(String itemId) =>

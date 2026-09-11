@@ -33,6 +33,20 @@ abstract class OrderRemoteDataSource {
   /// whether a UPI payment has been confirmed by the Razorpay webhook.
   Future<OrderStatusResult> getOrderStatus({required String orderId});
 
+  /// Verifies the Razorpay signature for a completed Checkout attempt and
+  /// returns the resulting order/payment status. Backed by `POST
+  /// payment/verify`.
+  Future<OrderStatusResult> verifyPayment({
+    required String orderId,
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  });
+
+  /// Restarts payment for [orderId], returning a fresh Razorpay order id to
+  /// reopen the Checkout sheet with. Backed by `POST payment/retry`.
+  Future<OrderCheckoutResult> retryPayment({required String orderId});
+
   /// Notifies the backend that a file's Drive upload finished, so it can
   /// finalize the item. Called once per file after its `uploadUrl` PUT succeeds.
   ///
@@ -309,6 +323,115 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   }
 
   @override
+  Future<OrderStatusResult> verifyPayment({
+    required String orderId,
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  }) async {
+    if (orderId.isEmpty) {
+      throw const OrderCreateException(
+        'Missing order ID for payment verification.',
+      );
+    }
+
+    try {
+      final response = await _dioClient.post(
+        path: ApiConstants.paymentVerify,
+        data: {
+          'orderId': orderId,
+          'razorpayOrderId': razorpayOrderId,
+          'razorpayPaymentId': razorpayPaymentId,
+          'razorpaySignature': razorpaySignature,
+        },
+      );
+
+      final responseData = response.data;
+      final responseMap = responseData is Map<String, dynamic>
+          ? responseData
+          : const <String, dynamic>{};
+      final data = responseMap['data'] is Map<String, dynamic>
+          ? responseMap['data'] as Map<String, dynamic>
+          : responseMap;
+
+      return OrderStatusResult.fromJson(data);
+    } on DioException catch (error, stackTrace) {
+      _logger.e(
+        'Payment verification failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to verify payment.',
+      );
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Unexpected payment verification error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error is OrderCreateException) {
+        rethrow;
+      }
+      throw const OrderCreateException('Failed to verify payment.');
+    }
+  }
+
+  @override
+  Future<OrderCheckoutResult> retryPayment({required String orderId}) async {
+    if (orderId.isEmpty) {
+      throw const OrderCreateException('Missing order ID to retry payment.');
+    }
+
+    try {
+      final response = await _dioClient.post(
+        path: ApiConstants.paymentRetry,
+        data: {'orderId': orderId},
+      );
+
+      final responseData = response.data;
+      final responseMap = responseData is Map<String, dynamic>
+          ? responseData
+          : const <String, dynamic>{};
+      final data = responseMap['data'] is Map<String, dynamic>
+          ? responseMap['data'] as Map<String, dynamic>
+          : responseMap;
+
+      return OrderCheckoutResult.fromJson(
+        data,
+        message: responseMap['message']?.toString(),
+      );
+    } on DioException catch (error, stackTrace) {
+      _logger.e('Payment retry failed', error: error, stackTrace: stackTrace);
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to retry payment.',
+      );
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Unexpected payment retry error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error is OrderCreateException) {
+        rethrow;
+      }
+      throw const OrderCreateException('Failed to retry payment.');
+    }
+  }
+
+  @override
   Future<void> completeUpload({
     required String itemId,
     required String driveFileId,
@@ -469,15 +592,23 @@ class OrderCheckoutResult {
     Map<String, dynamic> json, {
     String? message,
   }) {
+    // The backend nests the Razorpay order id under `payment.gatewayOrderId`
+    // (both for `order/checkout` and `payment/retry`), not a top-level
+    // `razorpayOrderId` — keep the flat key as a fallback in case that ever
+    // changes.
+    final payment = json['payment'] is Map<String, dynamic>
+        ? json['payment'] as Map<String, dynamic>
+        : null;
+
     return OrderCheckoutResult(
       orderId: (json['orderId'] as String?) ?? '',
       status: (json['status'] as String?) ?? (json['orderStatus'] as String?) ?? '',
       paymentMethod: (json['paymentMethod'] as String?) ?? '',
       grandTotal: (json['grandTotal'] as num?) ?? (json['totalAmount'] as num?) ?? 0,
       message: message ?? json['message']?.toString() ?? '',
-      // Only present for UPI checkout — the Razorpay order id to open the
-      // Checkout sheet with, so the webhook can trace payment back to us.
-      razorpayOrderId: json['razorpayOrderId'] as String?,
+      razorpayOrderId:
+          (json['razorpayOrderId'] as String?) ??
+          (payment?['gatewayOrderId'] as String?),
     );
   }
 
