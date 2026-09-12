@@ -1,7 +1,34 @@
 {
   "permissions": {
     "allow": [
-      "Bash(keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android)"
+      "Bash(keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android)",
+      "Bash(flutter analyze *)",
+      "Bash(flutter devices *)",
+      "Bash(adb devices *)",
+      "Bash($ADB devices *)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/platform-tools/adb shell *)",
+      "Bash(flutter build *)",
+      "Bash($ADB install *)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/platform-tools/adb logcat *)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/platform-tools/adb exec-out *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(flutter --version)",
+      "Bash(dart --version)",
+      "Bash(brew list *)",
+      "Bash(brew install *)",
+      "Bash(flutter pub *)",
+      "Bash(flutter test *)",
+      "Read(//Users/prasannvyawahare/development/flutter/bin/cache/artifacts/engine/**)",
+      "Bash(flutter --version --machine)",
+      "Bash(flutter precache *)",
+      "Bash(jobs -l)",
+      "Bash(rm *)",
+      "Bash(git check-ignore *)",
+      "Bash(python3 *)",
+      "Bash(echo \"no .env ignore rule found \\(exit $?\\)\")",
+      "Bash(git rm *)",
+      "Bash(rm -f .claude/rzp-key.csv)"
     ]
   }
 }
