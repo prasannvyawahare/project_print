@@ -33,7 +33,16 @@
       "Bash(:)",
       "Bash(flutter run *)",
       "Bash(disown)",
-      "Bash(dart format *)"
+      "Bash(dart format *)",
+      "Bash(unzip -l /Users/prasannvyawahare/flutter_projects/project_print/build/app/outputs/flutter-apk/app-prod-release.apk)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/build-tools/37.0.0/apksigner verify *)",
+      "Bash(dart run *)",
+      "Bash(sed -i '' 's/\"name\": \"project_print\"/\"name\": \"PrintHub\"/; s/\"short_name\": \"project_print\"/\"short_name\": \"PrintHub\"/' web/manifest.json)",
+      "Bash(sed -i '' 's/<title>project_print<\\\\/title>/<title>PrintHub<\\\\/title>/' web/index.html)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/build-tools/37.0.0/aapt2 dump *)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/platform-tools/adb devices *)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/platform-tools/adb install *)",
+      "Bash(/Users/prasannvyawahare/Library/Android/sdk/platform-tools/adb pull *)"
     ]
   }
 }
