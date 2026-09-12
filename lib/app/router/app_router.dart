@@ -8,6 +8,8 @@ import '../../features/home/presentation/bloc/home_bloc.dart';
 import '../../features/home/presentation/bloc/home_event.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/onboarding/presentation/pages/onboarding_page.dart';
+import '../../features/profile/presentation/bloc/profile_bloc.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/splash/presentation/pages/splash_page.dart';
 
 class AppRouter {
@@ -23,6 +25,7 @@ class AppRouter {
   static const String auth = '/auth';
   static const String main = '/main';
   static const String home = '/home';
+  static const String profile = '/profile';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -49,6 +52,16 @@ class AppRouter {
           builder: (_) => BlocProvider<HomeBloc>(
             create: (_) => sl<HomeBloc>()..add(const HomeRequested()),
             child: const HomePage(),
+          ),
+        );
+      case profile:
+        return MaterialPageRoute<void>(
+          // ProfileBloc is a DI singleton pre-fetched from the dashboard, so
+          // reuse its instance here instead of creating (and re-fetching) a
+          // new one.
+          builder: (_) => BlocProvider<ProfileBloc>.value(
+            value: sl<ProfileBloc>(),
+            child: const ProfilePage(),
           ),
         );
       default:

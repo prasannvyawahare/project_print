@@ -7,11 +7,13 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/payment_config.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/storage/active_job_store.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
 import '../../../../core/widgets/primary_action_button.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
 import '../../data/datasources/order_remote_data_source.dart';
 import '../../data/models/order_summary_model.dart';
+import 'order_confirmation_page.dart';
 
 double _screenScale(BuildContext context) {
   final size = MediaQuery.sizeOf(context);
@@ -227,6 +229,10 @@ class _SummaryContentState extends State<_SummaryContent> {
   /// Payment button backed by `payment/retry`.
   bool _paymentFailed = false;
 
+  /// Cached from the latest [build] so the payment callbacks (which don't
+  /// receive it directly) can pass it on to [OrderConfirmationPage].
+  double _amountToPay = 0;
+
   @override
   void initState() {
     super.initState();
@@ -373,6 +379,7 @@ class _SummaryContentState extends State<_SummaryContent> {
       if (!mounted) return;
 
       if (status.orderStatus == 'PAYMENT_FAILED') {
+        unawaited(_markActiveJobPaymentFailed());
         setState(() {
           _showPlacingBar = false;
           _paymentFailed = true;
@@ -387,24 +394,32 @@ class _SummaryContentState extends State<_SummaryContent> {
         return;
       }
 
+      unawaited(sl<ActiveJobStore>().remove(widget.orderId));
       setState(() {
         _showPlacingBar = false;
         _orderPlaced = true;
       });
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Payment complete — your order is ready for print!',
-            ),
-          ),
-        );
+      _goToConfirmation();
     } catch (_) {
       // Verification call itself failed (network/etc) — fall back to
       // polling for the webhook-confirmed status instead of assuming failure.
       unawaited(_pollPaymentStatus());
     }
+  }
+
+  /// Replaces the checkout screen with the post-payment confirmation/status
+  /// screen. Uses `pushReplacement` so the (already-paid) checkout screen
+  /// isn't left behind in the back stack.
+  void _goToConfirmation() {
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderConfirmationPage(
+          orderId: widget.orderId,
+          amountPaid: _amountToPay,
+        ),
+      ),
+    );
   }
 
   /// Called when the Razorpay sheet is cancelled or a payment fails
@@ -423,6 +438,17 @@ class _SummaryContentState extends State<_SummaryContent> {
       ..showSnackBar(
         const SnackBar(content: Text('Payment could not be completed.')),
       );
+  }
+
+  /// Updates the home-screen "Active Jobs" entry once the backend has
+  /// confirmed the payment actually failed, so it stops showing the stale
+  /// "Awaiting payment" label forever.
+  Future<void> _markActiveJobPaymentFailed() {
+    return sl<ActiveJobStore>().markStep(
+      widget.orderId,
+      step: ActiveJobStep.checkout,
+      status: 'Payment failed — tap to retry',
+    );
   }
 
   /// True when the backend rejected `checkout`/`payment/verify` because a
@@ -514,6 +540,7 @@ class _SummaryContentState extends State<_SummaryContent> {
         );
 
         if (status.orderStatus == 'PAYMENT_FAILED') {
+          unawaited(_markActiveJobPaymentFailed());
           setState(() {
             _showPlacingBar = false;
             _paymentFailed = true;
@@ -531,20 +558,12 @@ class _SummaryContentState extends State<_SummaryContent> {
 
         if (status.orderStatus != 'PAYMENT_PENDING') {
           // Webhook landed: order moved on to PENDING_ACCEPTANCE (or beyond).
+          unawaited(sl<ActiveJobStore>().remove(widget.orderId));
           setState(() {
             _showPlacingBar = false;
             _orderPlaced = true;
           });
-          if (!mounted) return;
-          ScaffoldMessenger.of(context)
-            ..clearSnackBars()
-            ..showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Payment complete — your order is ready for print!',
-                ),
-              ),
-            );
+          _goToConfirmation();
           return;
         }
       } catch (_) {
@@ -599,11 +618,12 @@ class _SummaryContentState extends State<_SummaryContent> {
     // falling back to the order summary totals (resumed jobs).
     final baseRate = (create?.baseRate ?? 0).toDouble();
     final subtotal = (create?.totalAmount ?? summary.totalAmount).toDouble();
-    final delivery = (create?.deliveryCharge ?? summary.deliveryCharge)
-        .toDouble();
+    final delivery =
+        (create?.deliveryCharge ?? summary.deliveryCharge).toDouble();
     final grandTotal = (create?.grandTotal ?? summary.grandTotal).toDouble();
     final discount = subtotal * _appliedRate;
     final amountToPay = grandTotal - discount;
+    _amountToPay = amountToPay;
 
     return Column(
       children: [

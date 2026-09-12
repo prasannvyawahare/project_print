@@ -145,6 +145,25 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
     super.dispose();
   }
 
+  /// Re-fetches `order/order-summary` after an item is removed via
+  /// `DELETE order/delete`, so the queue and billing totals stay in sync.
+  void _refreshQueue() {
+    final id = _orderId;
+    if (id == null) return;
+    final future = sl<OrderRemoteDataSource>().getOrderSummary(orderId: id);
+    setState(() => _queueFuture = future);
+    future
+        .then((summary) {
+          sl<ActiveJobStore>().markStep(
+            id,
+            step: ActiveJobStep.review,
+            subtotal: summary.totalAmount,
+            deliveryCharge: summary.deliveryCharge,
+          );
+        })
+        .catchError((_) {});
+  }
+
   /// File names to show in the queue when the API summary is unavailable
   /// (offline / resumed job): the freshly-configured order's documents, else
   /// the persisted active job's file list.
@@ -315,6 +334,8 @@ class _OrderReviewPageState extends State<OrderReviewPage> {
                             _QueueSection(
                               queueFuture: _queueFuture,
                               fallbackNames: _fallbackFileNames(),
+                              orderId: _orderId,
+                              onItemDeleted: _refreshQueue,
                             ),
                           SizedBox(height: _r(context, 24)),
                           Row(
@@ -670,10 +691,22 @@ class _UploadFileCard extends StatelessWidget {
 
 // ── Queue section ────────────────────────────────────────────────────────────
 class _QueueSection extends StatelessWidget {
-  const _QueueSection({required this.queueFuture, required this.fallbackNames});
+  const _QueueSection({
+    required this.queueFuture,
+    required this.fallbackNames,
+    required this.orderId,
+    required this.onItemDeleted,
+  });
 
   final Future<OrderSummaryResponse>? queueFuture;
   final List<String> fallbackNames;
+
+  /// Needed alongside each item's id to call `DELETE order/delete`. Null
+  /// when there's no order yet (nothing to delete against).
+  final String? orderId;
+
+  /// Refreshes the queue after an item is deleted.
+  final VoidCallback onItemDeleted;
 
   List<_QueueEntry> get _fallbackEntries =>
       fallbackNames.map((n) => _QueueEntry(name: n)).toList();
@@ -707,7 +740,14 @@ class _QueueSection extends StatelessWidget {
         final items = snapshot.data?.items ?? const <OrderSummaryItem>[];
         final entries = items.isEmpty
             ? _fallbackEntries
-            : items.map((i) => _QueueEntry(name: i.details.fileName)).toList();
+            : items
+                  .map(
+                    (i) => _QueueEntry(
+                      name: i.details.fileName,
+                      itemId: i.details.id,
+                    ),
+                  )
+                  .toList();
         return _buildList(context, entries);
       },
     );
@@ -760,7 +800,18 @@ class _QueueSection extends StatelessWidget {
           )
         else
           for (final entry in entries) ...[
-            _QueueFileCard(entry: entry),
+            _QueueFileCard(
+              entry: entry,
+              onDelete: (orderId != null && entry.itemId != null)
+                  ? () => _confirmAndDeleteItem(
+                      context,
+                      orderId: orderId!,
+                      itemId: entry.itemId!,
+                      fileName: entry.name,
+                      onDeleted: onItemDeleted,
+                    )
+                  : null,
+            ),
             SizedBox(height: _r(context, 12)),
           ],
       ],
@@ -768,10 +819,63 @@ class _QueueSection extends StatelessWidget {
   }
 }
 
+/// Confirms with the user, then removes [itemId] from [orderId] via
+/// `DELETE order/delete` — only valid while the order is pre-checkout.
+Future<void> _confirmAndDeleteItem(
+  BuildContext context, {
+  required String orderId,
+  required String itemId,
+  required String fileName,
+  required VoidCallback onDeleted,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Remove file?'),
+      content: Text('This removes "$fileName" from your order.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Keep'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFFD93025)),
+          child: const Text('Remove'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true) return;
+
+  try {
+    await sl<OrderRemoteDataSource>().deleteOrderItem(
+      orderId: orderId,
+      itemId: itemId,
+    );
+    onDeleted();
+  } on OrderCreateException catch (error) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error.message)));
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(const SnackBar(content: Text('Failed to remove the item.')));
+  }
+}
+
 class _QueueEntry {
-  const _QueueEntry({required this.name});
+  const _QueueEntry({required this.name, this.itemId});
 
   final String name;
+
+  /// Backend item id (`OrderSummaryItemDetails.id`). Null for entries shown
+  /// from the local fallback list (nothing to delete against yet).
+  final String? itemId;
 }
 
 IconData _fileIcon(String nameOrType) {
@@ -792,9 +896,13 @@ IconData _fileIcon(String nameOrType) {
 }
 
 class _QueueFileCard extends StatelessWidget {
-  const _QueueFileCard({required this.entry});
+  const _QueueFileCard({required this.entry, required this.onDelete});
 
   final _QueueEntry entry;
+
+  /// Removes this item via `DELETE order/delete`. Null when the item can't
+  /// be deleted yet (no backend item id, e.g. a local-only fallback entry).
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -884,7 +992,7 @@ class _QueueFileCard extends StatelessWidget {
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
-            onPressed: () => notImplemented('Delete'),
+            onPressed: onDelete ?? () => notImplemented('Delete'),
             icon: Icon(
               Icons.delete_outline_rounded,
               size: 20 * compact,

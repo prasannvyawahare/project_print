@@ -28,7 +28,12 @@
       "Bash(python3 *)",
       "Bash(echo \"no .env ignore rule found \\(exit $?\\)\")",
       "Bash(git rm *)",
-      "Bash(rm -f .claude/rzp-key.csv)"
+      "Bash(rm -f .claude/rzp-key.csv)",
+      "Bash(kill 12085)",
+      "Bash(:)",
+      "Bash(flutter run *)",
+      "Bash(disown)",
+      "Bash(dart format *)"
     ]
   }
 }

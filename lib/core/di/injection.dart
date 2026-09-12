@@ -25,6 +25,11 @@ import '../../features/delivery/domain/usecases/remove_address.dart';
 import '../../features/delivery/domain/usecases/select_address.dart';
 import '../../features/delivery/presentation/bloc/address_bloc.dart';
 import '../../features/print/data/datasources/print_config_remote_data_source.dart';
+import '../../features/profile/data/datasources/profile_remote_data_source.dart';
+import '../../features/profile/data/repositories/profile_repository_impl.dart';
+import '../../features/profile/domain/repositories/profile_repository.dart';
+import '../../features/profile/domain/usecases/get_user_profile.dart';
+import '../../features/profile/presentation/bloc/profile_bloc.dart';
 import '../../features/upload/data/datasources/drive_upload_data_source.dart';
 import '../../features/upload/data/datasources/order_remote_data_source.dart';
 import '../../features/home/data/datasources/home_remote_data_source.dart';
@@ -220,5 +225,32 @@ Future<void> initDependencies() async {
       firebaseAuth: sl<FirebaseAuth>(),
       logger: sl<Logger>(),
     ),
+  );
+
+  // Profile feature
+  sl.registerLazySingleton<ProfileRemoteDataSource>(
+    () => ProfileRemoteDataSourceImpl(
+      dioClient: sl<DioClient>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<ProfileRepository>(
+    () => ProfileRepositoryImpl(
+      remoteDataSource: sl<ProfileRemoteDataSource>(),
+      networkInfo: sl<NetworkInfo>(),
+      logger: sl<Logger>(),
+    ),
+  );
+
+  sl.registerLazySingleton<GetUserProfile>(
+    () => GetUserProfile(sl<ProfileRepository>()),
+  );
+
+  // Registered as a singleton (not a factory) so the fetch kicked off when
+  // the dashboard loads is still in-flight/cached when the user opens the
+  // profile screen, instead of every screen visit starting a fresh load.
+  sl.registerLazySingleton<ProfileBloc>(
+    () => ProfileBloc(getUserProfile: sl<GetUserProfile>()),
   );
 }

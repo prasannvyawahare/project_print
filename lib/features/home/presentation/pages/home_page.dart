@@ -2,17 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../../app/router/app_router.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/storage/active_job_store.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/printhub_app_bar.dart';
-import '../../../auth/domain/usecases/sign_out.dart';
 import '../../../upload/data/datasources/order_remote_data_source.dart';
+import '../../../upload/data/models/order_history_model.dart';
 import '../../domain/entities/print_category_entity.dart';
 import '../../../delivery/presentation/pages/order_review_page.dart'
     show OrderReviewPage;
+import '../../../profile/presentation/bloc/profile_bloc.dart';
+import '../../../profile/presentation/bloc/profile_event.dart';
+import '../../../profile/presentation/pages/profile_page.dart';
+import '../../../upload/presentation/pages/order_history_page.dart'
+    show OrderHistoryPage;
 import '../../../upload/presentation/pages/order_summary_page.dart'
     show OrderSummaryPage;
 import '../../../upload/presentation/pages/upload_documents_page.dart'
@@ -38,6 +43,7 @@ const _accent = AppColors.dashboardAccent;
 const _pageBackground = AppColors.dashboardBackground;
 const _primaryText = AppColors.dashboardPrimaryText;
 const _mutedText = AppColors.dashboardMutedText;
+const _success = AppColors.success;
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -56,8 +62,6 @@ class _HomeView extends StatefulWidget {
 }
 
 class _HomeViewState extends State<_HomeView> {
-  bool _isLoggingOut = false;
-
   String _greetingName() {
     final displayName = sl<TemporaryAuthStore>().displayName.trim();
     if (displayName.isEmpty) {
@@ -71,6 +75,26 @@ class _HomeViewState extends State<_HomeView> {
 
   void _loadActiveJobs() {
     setState(() => _activeJobs = sl<ActiveJobStore>().getJobs());
+  }
+
+  List<OrderHistoryEntry> _recentOrders = const <OrderHistoryEntry>[];
+  bool _recentOrdersLoading = true;
+
+  /// Fetches `GET order/history` and keeps just the most recent few for the
+  /// dashboard preview — the full list lives on the Orders tab.
+  Future<void> _loadRecentOrders() async {
+    setState(() => _recentOrdersLoading = true);
+    try {
+      final history = await sl<OrderRemoteDataSource>().getOrderHistory();
+      if (!mounted) return;
+      setState(() {
+        _recentOrders = history.orders.take(3).toList(growable: false);
+        _recentOrdersLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _recentOrdersLoading = false);
+    }
   }
 
   Future<void> _openUploadDocuments([PrintCategoryEntity? category]) async {
@@ -149,25 +173,25 @@ class _HomeViewState extends State<_HomeView> {
     }
   }
 
-  Future<void> _logout() async {
-    if (_isLoggingOut) return;
-
-    setState(() => _isLoggingOut = true);
-    final result = await sl<SignOut>()();
+  Future<void> _openOrders() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OrderHistoryPage()),
+    );
     if (!mounted) return;
-    setState(() => _isLoggingOut = false);
+    _loadRecentOrders();
+  }
 
-    result.fold(
-      (failure) {
-        ScaffoldMessenger.of(context)
-          ..clearSnackBars()
-          ..showSnackBar(SnackBar(content: Text(failure.message)));
-      },
-      (_) {
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(AppRouter.auth, (route) => false);
-      },
+  Future<void> _openProfile() async {
+    // ProfileBloc is a DI singleton already fetching/fetched from the
+    // dashboard's initState below, so reuse it instead of creating a new
+    // bloc that would re-fetch and flash a loading spinner.
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BlocProvider<ProfileBloc>.value(
+          value: sl<ProfileBloc>(),
+          child: const ProfilePage(),
+        ),
+      ),
     );
   }
 
@@ -175,6 +199,10 @@ class _HomeViewState extends State<_HomeView> {
   void initState() {
     super.initState();
     _activeJobs = sl<ActiveJobStore>().getJobs();
+    _loadRecentOrders();
+    // Kick off the profile fetch as soon as the dashboard loads so it's
+    // already available by the time the user taps the Profile tab.
+    sl<ProfileBloc>().add(const ProfileRequested());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<HomeBloc>().add(const HomeRequested());
@@ -270,6 +298,29 @@ class _HomeViewState extends State<_HomeView> {
                             ),
                             SizedBox(height: _r(context, 12)),
                           ],
+                        SizedBox(height: _r(context, 22)),
+                        _SectionHeader(
+                          title: _recentOrders.length > 1
+                              ? 'RECENT ORDERS'
+                              : 'RECENT ORDER',
+                          onViewAll: _openOrders,
+                        ),
+                        SizedBox(height: _r(context, 12)),
+                        if (_recentOrdersLoading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (_recentOrders.isEmpty)
+                          const _NoRecentOrders()
+                        else
+                          for (final order in _recentOrders) ...[
+                            _RecentOrderCard(
+                              entry: order,
+                              onTap: _openOrders,
+                            ),
+                            SizedBox(height: _r(context, 12)),
+                          ],
                         SizedBox(height: _r(context, 8)),
                       ],
                     ),
@@ -280,121 +331,11 @@ class _HomeViewState extends State<_HomeView> {
           },
         ),
       ),
-      bottomNavigationBar: _BottomNavBar(onProfile: _openProfileSheet),
-    );
-  }
-
-  void _openProfileSheet() {
-    final store = sl<TemporaryAuthStore>();
-    final name = store.displayName.trim().isEmpty
-        ? 'Alex'
-        : store.displayName.trim();
-    final mobile = store.mobile.trim();
-    final initial = name.isEmpty ? 'A' : name[0].toUpperCase();
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      bottomNavigationBar: AppBottomNavBar(
+        currentIndex: 0,
+        onOrders: _openOrders,
+        onProfile: _openProfile,
       ),
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE0E2EC),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE8F0FE),
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        initial,
-                        style: const TextStyle(
-                          color: _accent,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name.capitalizeFirst(),
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w800,
-                              color: _primaryText,
-                            ),
-                          ),
-                          if (mobile.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              mobile,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: _mutedText,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoggingOut
-                        ? null
-                        : () {
-                            Navigator.of(sheetContext).pop();
-                            _logout();
-                          },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFE53935),
-                      side: const BorderSide(color: Color(0xFFF1C5C5)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: const Icon(Icons.logout_rounded, size: 20),
-                    label: const Text(
-                      'Log out',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
@@ -905,6 +846,181 @@ class _ActiveJobCard extends StatelessWidget {
   }
 }
 
+// ── Recent order card (dashboard preview of `GET order/history`) ────────────
+class _NoRecentOrders extends StatelessWidget {
+  const _NoRecentOrders();
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: 16 * compact,
+        vertical: 22 * compact,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20 * compact),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.receipt_long_outlined,
+            size: 34 * compact,
+            color: const Color(0xFFB4AEC6),
+          ),
+          SizedBox(height: 8 * compact),
+          Text(
+            'No orders yet',
+            style: TextStyle(
+              color: _primaryText,
+              fontSize: 14 * compact,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          SizedBox(height: 2 * compact),
+          Text(
+            'Your completed orders will show up here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _mutedText,
+              fontSize: 12 * compact,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentOrderCard extends StatelessWidget {
+  const _RecentOrderCard({required this.entry, required this.onTap});
+
+  final OrderHistoryEntry entry;
+  final VoidCallback onTap;
+
+  (String, Color) _statusStyle(String rawStatus) {
+    final status = rawStatus.toUpperCase();
+    if (status.contains('CANCEL') || status.contains('FAILED')) {
+      return ('Cancelled', const Color(0xFFD93025));
+    }
+    if (status.contains('DELIVER') || status.contains('COMPLETE')) {
+      return ('Delivered', _success);
+    }
+    if (status.contains('OUT') || status.contains('DISPATCH')) {
+      return ('Out for delivery', const Color(0xFFF59E0B));
+    }
+    if (status.contains('PRINT')) {
+      return ('Printing', const Color(0xFFF59E0B));
+    }
+    if (status.isEmpty) {
+      return ('Processing', const Color(0xFFF59E0B));
+    }
+    return ('In progress', const Color(0xFFF59E0B));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = _screenScale(context);
+    final extra = entry.itemCount > 1 ? '  +${entry.itemCount - 1} more' : '';
+    final (statusLabel, statusColor) = _statusStyle(entry.orderStatus);
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20 * compact),
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20 * compact),
+        child: Padding(
+          padding: EdgeInsets.all(16 * compact),
+          child: Row(
+            children: [
+              Container(
+                width: 48 * compact,
+                height: 48 * compact,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F0FE),
+                  borderRadius: BorderRadius.circular(12 * compact),
+                ),
+                child: Icon(
+                  Icons.receipt_long_rounded,
+                  color: _accent,
+                  size: 26 * compact,
+                ),
+              ),
+              SizedBox(width: 12 * compact),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${entry.title}$extra',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _primaryText,
+                        fontSize: 15 * compact,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    SizedBox(height: 6 * compact),
+                    Row(
+                      children: [
+                        Container(
+                          width: 8 * compact,
+                          height: 8 * compact,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: 8 * compact),
+                        Text(
+                          statusLabel,
+                          style: TextStyle(
+                            color: _mutedText,
+                            fontSize: 12.5 * compact,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 8 * compact),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (entry.grandTotal > 0)
+                    Text(
+                      'Rs. ${entry.grandTotal.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        color: _accent,
+                        fontSize: 14 * compact,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: const Color(0xFF8A8599),
+                    size: 24 * compact,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 extension StringExtension on String {
   String capitalizeFirst() {
     if (this.isEmpty) return "";
@@ -1060,115 +1176,3 @@ Color _iconColorForIndex(int index) {
   return palette[index % palette.length];
 }
 
-// ── Bottom navigation ────────────────────────────────────────────────────────
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({required this.onProfile});
-
-  final VoidCallback onProfile;
-
-  @override
-  Widget build(BuildContext context) {
-    final compact = _screenScale(context);
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x14000000),
-            blurRadius: 12,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.fromLTRB(
-        12 * compact,
-        8 * compact,
-        12 * compact,
-        10 * compact,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _BottomItem(
-            icon: Icons.home_rounded,
-            label: 'Home',
-            active: true,
-            compact: compact,
-          ),
-          _BottomItem(
-            icon: Icons.assignment_outlined,
-            label: 'Orders',
-            compact: compact,
-          ),
-          _BottomItem(
-            icon: Icons.person_outline,
-            label: 'Profile',
-            compact: compact,
-            onTap: onProfile,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BottomItem extends StatelessWidget {
-  const _BottomItem({
-    required this.icon,
-    required this.label,
-    required this.compact,
-    this.active = false,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final double compact;
-  final bool active;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = _accent;
-    const inactiveColor = Color(0xFF99A0B5);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12 * compact),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 6 * compact),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 24 * compact,
-              color: active ? activeColor : inactiveColor,
-            ),
-            SizedBox(height: 4 * compact),
-            Text(
-              label,
-              style: TextStyle(
-                color: active ? activeColor : inactiveColor,
-                fontSize: 11 * compact,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              ),
-            ),
-            SizedBox(height: 4 * compact),
-            if (active)
-              Container(
-                width: 18 * compact,
-                height: 3 * compact,
-                decoration: BoxDecoration(
-                  color: activeColor,
-                  borderRadius: BorderRadius.circular(2 * compact),
-                ),
-              )
-            else
-              SizedBox(height: 3 * compact),
-          ],
-        ),
-      ),
-    );
-  }
-}

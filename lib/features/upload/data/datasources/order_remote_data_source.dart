@@ -5,6 +5,7 @@ import 'package:logger/logger.dart';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/storage/temporary_auth_store.dart';
+import '../models/order_history_model.dart';
 import '../models/order_summary_model.dart';
 
 abstract class OrderRemoteDataSource {
@@ -15,6 +16,9 @@ abstract class OrderRemoteDataSource {
   });
 
   Future<OrderSummaryResponse> getOrderSummary({required String orderId});
+
+  /// Lists the signed-in user's past orders. Backed by `GET order/history`.
+  Future<OrderHistoryResponse> getOrderHistory();
 
   /// Places the order for [orderId] against [addressId] with the chosen
   /// [paymentMethod] (e.g. `COD`). Backed by `POST order/checkout`.
@@ -27,6 +31,13 @@ abstract class OrderRemoteDataSource {
   /// Cancels (deletes) the order [orderId] on the backend via
   /// `DELETE order/cancel`.
   Future<void> cancelOrder({required String orderId});
+
+  /// Removes item [itemId] from [orderId]. Only allowed while the order is
+  /// still pre-checkout. Backed by `DELETE order/delete`.
+  Future<void> deleteOrderItem({
+    required String orderId,
+    required String itemId,
+  });
 
   /// Fetches `{orderStatus, paymentStatus, paymentMethod}` for [orderId].
   /// Backed by `GET order/<orderId>/status` — the authoritative source for
@@ -191,6 +202,80 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         rethrow;
       }
       throw const OrderCreateException('Failed to load order summary.');
+    }
+  }
+
+  @override
+  Future<void> deleteOrderItem({
+    required String orderId,
+    required String itemId,
+  }) async {
+    if (orderId.isEmpty) {
+      throw const OrderCreateException('Missing order ID to delete item.');
+    }
+    if (itemId.isEmpty) {
+      throw const OrderCreateException('Missing item ID to delete.');
+    }
+
+    try {
+      await _dioClient.delete(
+        path: ApiConstants.orderDelete,
+        data: {'orderId': orderId, 'itemId': itemId},
+      );
+    } on DioException catch (error, stackTrace) {
+      _logger.e('Order item delete failed', error: error, stackTrace: stackTrace);
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to remove the item.',
+      );
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Unexpected order item delete error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error is OrderCreateException) {
+        rethrow;
+      }
+      throw const OrderCreateException('Failed to remove the item.');
+    }
+  }
+
+  @override
+  Future<OrderHistoryResponse> getOrderHistory() async {
+    try {
+      final response = await _dioClient.get(path: ApiConstants.orderHistory);
+      return OrderHistoryResponse.fromJson(response.data);
+    } on DioException catch (error, stackTrace) {
+      _logger.e(
+        'Order history fetch failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+
+      final data = error.response?.data;
+      final backendMessage = data is Map<String, dynamic>
+          ? (data['message']?.toString() ?? data['error']?.toString())
+          : null;
+
+      throw OrderCreateException(
+        backendMessage ?? error.message ?? 'Failed to load order history.',
+      );
+    } catch (error, stackTrace) {
+      _logger.e(
+        'Unexpected order history error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (error is OrderCreateException) {
+        rethrow;
+      }
+      throw const OrderCreateException('Failed to load order history.');
     }
   }
 

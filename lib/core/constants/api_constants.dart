@@ -5,6 +5,7 @@ class ApiConstants {
 
   static const String checkStorageExists = 'user/storage-exists';
   static const String createStorage = 'user/create-storage';
+  static const String userProfile = 'user/profile';
   static const String printTypePath = 'print-type/get';
   static const String printConfigPath = 'print-config/get';
 
@@ -20,6 +21,13 @@ class ApiConstants {
   static const String orderSummary = 'order/order-summary';
   static const String orderCheckout = 'order/checkout';
   static const String orderCancel = 'order/cancel';
+
+  /// Removes a single item from an order. Only allowed while the order is
+  /// still in a pre-checkout state. Backed by `DELETE order/delete`.
+  static const String orderDelete = 'order/delete';
+
+  /// Lists the signed-in user's past orders. Backed by `GET order/history`.
+  static const String orderHistory = 'order/history';
 
   /// Verifies a Razorpay payment signature server-side after the Checkout
   /// sheet reports success. Backed by `POST payment/verify`.
